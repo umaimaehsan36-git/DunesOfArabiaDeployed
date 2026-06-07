@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DunesOfArabia")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e2727fa7948811e6181a101363eca95431e5da8d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+301e0a6d3fea6101888d385549ab1676b3ab82a3")]
 [assembly: System.Reflection.AssemblyProductAttribute("DunesOfArabia")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DunesOfArabia")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
