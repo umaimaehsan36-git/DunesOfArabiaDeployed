@@ -25,8 +25,19 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 // =====================================================
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(
-    builder.Configuration.GetConnectionString("DefaultConnection"));
+    var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
+              ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+              ?? "";
+
+    // Convert postgres:// URL to Npgsql format if needed
+    if (connStr.StartsWith("postgresql://") || connStr.StartsWith("postgres://"))
+    {
+        var uri = new Uri(connStr);
+        var userInfo = uri.UserInfo.Split(':');
+        connStr = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+    }
+
+    options.UseNpgsql(connStr);
 });
 
 // =====================================================
