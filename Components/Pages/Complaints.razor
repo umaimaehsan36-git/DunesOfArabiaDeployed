@@ -1,0 +1,239 @@
+@page "/complaints"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+
+@attribute [Authorize]
+
+@inject IComplaintService ComplaintService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Complaints – Saudi Heritage</PageTitle>
+
+<style>
+    .comp-page  { padding: 2rem; background: #F5EFE8; min-height: 100vh; }
+    .page-header { margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 1.8rem; color: #7B3121; font-weight: 700; margin: 0; }
+    .page-header p  { color: #888; margin-top: 0.25rem; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 420px; gap: 1.5rem; align-items: start; }
+
+    .form-card { background: white; border-radius: 14px; padding: 1.6rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 1rem; }
+    .form-card h2 { color: #7B3121; font-size: 1.15rem; margin: 0 0 1.2rem; }
+
+    .fg       { margin-bottom: 1.1rem; }
+    .fg label { display: block; font-size: 0.85rem; font-weight: 600; color: #444; margin-bottom: 4px; }
+    .fg select, .fg input, .fg textarea {
+        width: 100%; border: 1px solid #D6C5BB; border-radius: 8px;
+        padding: 9px 12px; font-size: 0.9rem; background: #FDFAF7;
+        color: #333; box-sizing: border-box; font-family: inherit;
+    }
+    .fg textarea { resize: vertical; min-height: 100px; }
+    .char-hint  { font-size: 0.75rem; color: #aaa; text-align: right; margin-top: 2px; }
+
+    .btn-submit { width: 100%; background: #7B3121; color: white; border: none; padding: 11px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; font-weight: 600; margin-top: 0.4rem; }
+    .btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .alert-ok  { background: #e6f4ea; color: #2e7d32; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem; }
+    .alert-err { background: #fce4ec; color: #c62828; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem; }
+
+    .sec-title  { font-size: 1.1rem; font-weight: 700; color: #7B3121; margin-bottom: 1rem; }
+
+    .c-card { background: white; border-radius: 14px; padding: 1.3rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #C8873A; }
+    .c-top  { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem; }
+    .c-cat  { font-weight: 700; color: #2C1A12; font-size: 1rem; }
+
+    .badge        { padding: 3px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .b-Open       { background: #fff8e1; color: #f57f17; }
+    .b-InProgress { background: #e3f2fd; color: #1565c0; }
+    .b-Resolved   { background: #e6f4ea; color: #2e7d32; }
+    .b-Closed     { background: #f5f5f5; color: #777; }
+
+    .c-subject { font-size: 0.95rem; color: #444; margin-bottom: 0.4rem; }
+    .c-body    { font-size: 0.87rem; color: #666; line-height: 1.5; white-space: pre-wrap; }
+    .c-meta    { font-size: 0.78rem; color: #aaa; margin-top: 0.7rem; display: flex; gap: 1rem; }
+
+    .response-box { background: #F0EAE5; border-radius: 8px; padding: 0.8rem 1rem; margin-top: 0.8rem; font-size: 0.87rem; color: #444; border-left: 3px solid #7B3121; }
+    .response-box strong { display: block; color: #7B3121; margin-bottom: 3px; font-size: 0.8rem; }
+
+    .empty-state    { background: white; border-radius: 14px; padding: 3rem; text-align: center; color: #888; }
+    .empty-state h3 { color: #7B3121; }
+    .loading-spinner { text-align: center; padding: 3rem; color: #7B3121; }
+</style>
+
+<div class="comp-page">
+
+    <div class="page-header">
+        <h1>Complaints</h1>
+        <p>Submit and track your complaints. We aim to respond within 48 hours.</p>
+    </div>
+
+    <div class="two-col">
+
+        <!-- Left: history -->
+        <div>
+            <div class="sec-title">Your Complaints</div>
+
+            @if (isLoading)
+            {
+                <div class="loading-spinner">Loading…</div>
+            }
+            else if (!complaints.Any())
+            {
+                <div class="empty-state">
+                    <h3>No complaints yet</h3>
+                    <p>Use the form to submit one.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var c in complaints)
+                {
+                    var badgeCss = "b-" + c.Status?.Replace(" ", "") ?? "b-Open";
+                    <div class="c-card">
+                        <div class="c-top">
+                            <span class="c-cat">@c.Category</span>
+                            <span class="badge @badgeCss">@c.Status</span>
+                        </div>
+                        <div class="c-subject">@c.Subject</div>
+                        <div class="c-body">@c.Description</div>
+                        <div class="c-meta">
+                            <span>@c.CreatedAt.ToString("dd MMM yyyy, HH:mm")</span>
+                            @if (c.ResolvedAt.HasValue)
+                            {
+                                <span>Resolved: @c.ResolvedAt.Value.ToString("dd MMM yyyy")</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(c.AdminResponse))
+                        {
+                            <div class="response-box">
+                                <strong>Staff Response</strong>
+                                @c.AdminResponse
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Right: form -->
+        <div>
+            <div class="form-card">
+                <h2>Submit a New Complaint</h2>
+
+                @if (!string.IsNullOrEmpty(okMsg))  { <div class="alert-ok">@okMsg</div>  }
+                @if (!string.IsNullOrEmpty(errMsg)) { <div class="alert-err">@errMsg</div> }
+
+                <div class="fg">
+                    <label>Category *</label>
+                    <select @bind="fCategory">
+                        <option value="">— Select category —</option>
+                        <option>Booking Issue</option>
+                        <option>Payment Problem</option>
+                        <option>Destination Information</option>
+                        <option>Tour / Activity</option>
+                        <option>Website / App Bug</option>
+                        <option>Staff Behaviour</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+
+                <div class="fg">
+                    <label>Subject *</label>
+                    <input type="text" maxlength="120" placeholder="Brief summary"
+                           @bind="fSubject" @bind:event="oninput" />
+                    <div class="char-hint">@fSubject.Length / 120</div>
+                </div>
+
+                <div class="fg">
+                    <label>Description *</label>
+                    <textarea maxlength="1000" placeholder="Describe the issue…"
+                              @bind="fDesc" @bind:event="oninput"></textarea>
+                    <div class="char-hint">@fDesc.Length / 1000</div>
+                </div>
+
+                <button class="btn-submit"
+                        disabled="@(busy || !Valid)"
+                        @onclick="DoSubmitAsync">
+                    @(busy ? "Submitting…" : "Submit Complaint")
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+
+    private bool   isLoading = true;
+    private bool   busy      = false;
+    private string okMsg     = "";
+    private string errMsg    = "";
+    private string fCategory = "";
+    private string fSubject  = "";
+    private string fDesc     = "";
+    private string userId    = "";
+
+    private bool Valid =>
+        !string.IsNullOrWhiteSpace(fCategory) &&
+        !string.IsNullOrWhiteSpace(fSubject)  &&
+        !string.IsNullOrWhiteSpace(fDesc);
+
+    private List<Complaint> complaints = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId   = auth.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // IComplaintService: GetUserComplaintsAsync(string userId)
+            complaints = await ComplaintService.GetUserComplaintsAsync(userId);
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[Complaints] Load: " + ex.Message); }
+        finally { isLoading = false; }
+    }
+
+    private async Task DoSubmitAsync()
+    {
+        if (!Valid) return;
+        busy   = true;
+        okMsg  = "";
+        errMsg = "";
+        try
+        {
+            // IComplaintService: SubmitComplaintAsync(Complaint complaint)
+            // Complaint model fields: UserId, Category, Subject, Description, Status, CreatedAt
+            var c = new Complaint
+            {
+                UserId      = userId,
+                Category    = fCategory,
+                Subject     = fSubject,
+                Description = fDesc
+            };
+            await ComplaintService.SubmitComplaintAsync(c);
+            okMsg     = "Complaint submitted! We'll respond within 48 hours.";
+            fCategory = "";
+            fSubject  = "";
+            fDesc     = "";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            errMsg = "Failed to submit. Please try again.";
+            Console.Error.WriteLine("[Complaints] Submit: " + ex.Message);
+        }
+        finally { busy = false; }
+    }
+}

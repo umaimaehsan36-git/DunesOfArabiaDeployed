@@ -1,0 +1,1733 @@
+@page "/admin"
+@rendermode InteractiveServer
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@using DunesOfArabia.Data
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize(Roles = "Admin")]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject IBookingService BookingService
+@inject IComplaintService ComplaintService
+@inject IDestinationService DestinationService
+@inject IActivityService ActivityService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Admin Dashboard – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700&family=Lato:wght@300;400;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .admin-root {
+        display: flex;
+        min-height: 100vh;
+        background: #F5EFE8;
+        font-family: 'Lato', sans-serif;
+    }
+
+    /* ════════════════════════════════
+       SIDEBAR  (matches SideNav theme)
+    ════════════════════════════════ */
+    .adm-sidebar {
+        width: 210px;
+        flex-shrink: 0;
+        background: #FAF6F1;
+        border-right: 1px solid #E8DDD3;
+        display: flex;
+        flex-direction: column;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+
+    /* Brand / logo */
+    .adm-brand {
+        padding: 1.6rem 1.4rem 1.2rem;
+        border-bottom: 1px solid #EAE0D8;
+        text-decoration: none;
+        display: block;
+    }
+    .adm-brand-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #7B3121;
+        letter-spacing: 2.5px;
+        line-height: 1.3;
+        text-transform: uppercase;
+    }
+    .adm-brand-sub {
+        font-size: 0.65rem;
+        color: #B09A8A;
+        letter-spacing: 1px;
+        display: block;
+        margin-top: 2px;
+        font-family: 'Lato', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+    }
+
+    /* Nav section labels */
+    .adm-nav { flex: 1; padding: 1.1rem 0 0.4rem; }
+    .adm-nav-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 1.4px;
+        color: #C0AFA5;
+        padding: 0.7rem 1.4rem 0.3rem;
+        text-transform: uppercase;
+        font-family: 'Lato', sans-serif;
+    }
+
+    /* Nav buttons */
+    .adm-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 1.4rem;
+        background: none;
+        border: none;
+        border-left: 3px solid transparent;
+        color: #4A3828;
+        font-size: 0.88rem;
+        font-weight: 500;
+        font-family: 'Lato', sans-serif;
+        cursor: pointer;
+        text-align: left;
+        transition: color 0.18s, background 0.18s, border-color 0.18s;
+    }
+    .adm-nav-item:hover {
+        color: #7B3121;
+        background: rgba(123,49,33,0.06);
+        border-left-color: rgba(123,49,33,0.3);
+    }
+    .adm-nav-item.active {
+        color: white;
+        background: #7B3121;
+        border-left-color: #7B3121;
+        border-radius: 0 6px 6px 0;
+        margin-right: 0.8rem;
+    }
+    .adm-nav-item.active:hover { background: #6A2819; }
+    .adm-nav-item svg { flex-shrink: 0; opacity: 0.75; }
+    .adm-nav-item.active svg { opacity: 1; stroke: white !important; }
+    .adm-nav-item:not(.active) svg { stroke: #7A6658; }
+
+    .adm-badge {
+        margin-left: auto;
+        background: #7B3121;
+        color: white;
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+
+    /* Divider */
+    .adm-divider {
+        height: 1px;
+        background: #EAE0D8;
+        margin: 0.5rem 1.4rem;
+    }
+
+    /* Footer */
+    .adm-footer {
+        margin-top: auto;
+        padding: 1rem 1.4rem 1.4rem;
+        border-top: 1px solid #EAE0D8;
+    }
+    .adm-user-info {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 0.75rem;
+    }
+    .adm-user-avatar {
+        width: 34px; height: 34px;
+        background: #7B3121;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        color: white;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .adm-user-name {
+        font-size: 0.83rem;
+        color: #2E1A0E;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .adm-user-label {
+        font-size: 0.65rem;
+        color: #9A8878;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    /* FIX: logout uses — Identity endpoint handles the actual sign-out
+       cookie invalidation. SignInManager.SignOutAsync() in InteractiveServer
+       rendermode does NOT reliably clear the auth cookie, so the button appeared
+       to do nothing. The href approach triggers a full-page POST/redirect through
+       the Identity pipeline which correctly clears everything. */
+    .btn-signout {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        background: rgba(123,49,33,0.06);
+        color: #7B3121;
+        border: 1px solid #D4C0B4;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-family: 'Lato', sans-serif;
+        cursor: pointer;
+        transition: background 0.18s, color 0.18s;
+        text-decoration: none;
+        margin-top: 0.5rem;
+    }
+    .btn-signout:hover { background: #7B3121; color: white; border-color: #7B3121; }
+
+    /* ════════════════════════════════
+       MAIN CONTENT
+    ════════════════════════════════ */
+    .adm-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        overflow-y: auto;
+    }
+
+    .adm-topbar {
+        background: white;
+        border-bottom: 1px solid #EAD9C8;
+        padding: 1.1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        box-shadow: 0 1px 4px rgba(90,55,35,0.06);
+    }
+    .adm-topbar-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #1C1008;
+    }
+    .adm-topbar-date { font-size: 0.78rem; color: #9A7060; margin-top: 2px; }
+
+    .adm-body { padding: 2rem; }
+
+    /* ════════════════════════════════
+       ALERT
+    ════════════════════════════════ */
+    .adm-alert {
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 0.84rem;
+        margin-bottom: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+    }
+    .adm-alert-ok  { background: #EDFAF4; color: #1A6B45; border: 1px solid #A8DFC2; }
+    .adm-alert-err { background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; }
+
+    /* ════════════════════════════════
+       KPI CARDS
+    ════════════════════════════════ */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .kpi-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.4rem 1.5rem;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.07);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-left: 4px solid var(--kpi-color);
+    }
+    .kpi-icon {
+        width: 46px; height: 46px;
+        background: var(--kpi-bg);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .kpi-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #1C1008;
+        line-height: 1;
+    }
+    .kpi-label { font-size: 0.76rem; color: #9A7060; margin-top: 3px; }
+    .kpi-card.k-gold   { --kpi-color:#C8873A; --kpi-bg:#FEF3E2; }
+    .kpi-card.k-brown  { --kpi-color:#7B3121; --kpi-bg:#FAE8E0; }
+    .kpi-card.k-green  { --kpi-color:#2D8653; --kpi-bg:#E8F7EF; }
+    .kpi-card.k-red    { --kpi-color:#C0392B; --kpi-bg:#FEF0EE; }
+
+    /* ════════════════════════════════
+       PANEL
+    ════════════════════════════════ */
+    .panel {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.07);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        border: 1px solid #EAD9C8;
+    }
+    .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #F0E4D4;
+        background: #FDFAF7;
+    }
+    .panel-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1C1008;
+    }
+    .panel-body { padding: 0; }
+
+    /* ════════════════════════════════
+       TABLE
+    ════════════════════════════════ */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .data-table th {
+        text-align: left;
+        padding: 0.65rem 1rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #9A7060;
+        border-bottom: 1px solid #F0E4D4;
+        background: #FDFAF7;
+    }
+    .data-table td {
+        padding: 0.75rem 1rem;
+        color: #3A2015;
+        border-bottom: 1px solid #F8F0E8;
+        vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover td { background: #FDF7F2; }
+
+    /* ════════════════════════════════
+       BADGES
+    ════════════════════════════════ */
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.74rem;
+        font-weight: 700;
+    }
+    .b-Admin      { background: #FEF3E2; color: #C8873A; }
+    .b-User       { background: #F0E8DF; color: #7A5040; }
+    .b-Confirmed  { background: #EDFAF4; color: #1A6B45; }
+    .b-Pending    { background: #FEF3E2; color: #C8873A; }
+    .b-Completed  { background: #EEF2FF; color: #3B5BDB; }
+    .b-Cancelled  { background: #FEF0EE; color: #C0392B; }
+    .b-Open       { background: #FEF3E2; color: #C8873A; }
+    .b-InProgress { background: #EEF2FF; color: #3B5BDB; }
+    .b-Resolved   { background: #EDFAF4; color: #1A6B45; }
+    .b-Closed     { background: #F0F0F0; color: #888; }
+
+    /* ════════════════════════════════
+       BUTTONS
+    ════════════════════════════════ */
+    .btn-sm {
+        padding: 6px 13px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .btn-sm:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-primary  { background: #7B3121; color: white; }
+    .btn-gold     { background: #C8873A; color: white; }
+    .btn-danger   { background: white;   color: #C0392B; border: 1px solid #C0392B; }
+    .btn-success  { background: white;   color: #1A6B45; border: 1px solid #1A6B45; }
+
+    /* ════════════════════════════════
+       SEARCH / SELECT
+    ════════════════════════════════ */
+    .search-bar, .filter-select {
+        padding: 7px 12px;
+        border: 1px solid #EAD9C8;
+        border-radius: 7px;
+        background: white;
+        color: #3A2015;
+        font-size: 0.84rem;
+        font-family: inherit;
+    }
+    .search-bar:focus, .filter-select:focus { outline: none; border-color: #C8873A; }
+    .search-bar::placeholder { color: #C4AE9E; }
+    .search-bar { width: 230px; }
+
+    /* ════════════════════════════════
+       MODAL
+    ════════════════════════════════ */
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(28,16,8,0.55);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 200;
+        backdrop-filter: blur(2px);
+    }
+    .modal-box {
+        background: white;
+        border-radius: 14px;
+        padding: 2rem;
+        width: 100%; max-width: 460px;
+        box-shadow: 0 20px 60px rgba(28,16,8,0.25);
+        border: 1px solid #EAD9C8;
+    }
+    .modal-box h3 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.2rem;
+        color: #1C1008;
+        margin-bottom: 0.4rem;
+    }
+    .modal-box p { font-size: 0.86rem; color: #7A5040; margin-bottom: 1.2rem; line-height: 1.6; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
+    .modal-input, .modal-textarea, .modal-select {
+        width: 100%; padding: 9px 12px;
+        border: 1px solid #EAD9C8; border-radius: 7px;
+        background: #FDFAF7; color: #1C1008;
+        font-size: 0.86rem; font-family: inherit;
+        margin-bottom: 0.9rem;
+    }
+    .modal-input:focus, .modal-textarea:focus, .modal-select:focus { outline: none; border-color: #C8873A; }
+    .modal-textarea { min-height: 90px; resize: vertical; }
+
+    /* ════════════════════════════════
+       LOADING / EMPTY
+    ════════════════════════════════ */
+    .state-box {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: #9A7060;
+    }
+    .state-box .state-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+    .state-box p { font-size: 0.9rem; }
+
+    /* ════════════════════════════════
+       TWO-COL GRID
+    ════════════════════════════════ */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+    @@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+    @@media (max-width: 900px)  { .two-col { grid-template-columns: 1fr; } }
+    @@media (max-width: 768px)  {
+        .adm-sidebar { display: none; }
+        .adm-body { padding: 1rem; }
+        .kpi-grid { grid-template-columns: repeat(2,1fr); }
+    }
+</style>
+
+<div class="admin-root">
+
+    <!-- ═══════════ SIDEBAR ═══════════ -->
+    <aside class="adm-sidebar">
+
+        <!-- Logo -->
+        <div class="adm-brand">
+            <div class="adm-brand-title">Saudi Heritage</div>
+            <div class="adm-brand-sub">Admin Console</div>
+        </div>
+
+        <nav class="adm-nav">
+            <div class="adm-nav-label">Overview</div>
+
+            <button class="adm-nav-item @(activeSection=="dashboard"?"active":"")"
+                    @onclick='()=>activeSection="dashboard"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                Dashboard
+            </button>
+
+            <div class="adm-divider"></div>
+            <div class="adm-nav-label">Management</div>
+
+            <button class="adm-nav-item @(activeSection=="users"?"active":"")"
+                    @onclick='()=>activeSection="users"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                Users
+            </button>
+
+            <button class="adm-nav-item @(activeSection=="bookings"?"active":"")"
+                    @onclick='()=>activeSection="bookings"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                Bookings
+                @if (kpiBookings > 0)
+                {
+                    <span class="adm-badge">@kpiBookings</span>
+                }
+            </button>
+
+            <button class="adm-nav-item @(activeSection=="complaints"?"active":"")"
+                    @onclick='()=>activeSection="complaints"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Complaints
+                @if (openComplaintsCount > 0)
+                {
+                    <span class="adm-badge">@openComplaintsCount</span>
+                }
+            </button>
+
+            <button class="adm-nav-item @(activeSection=="destinations"?"active":"")"
+                    @onclick='()=>activeSection="destinations"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+                Destinations
+            </button>
+
+            <button class="adm-nav-item @(activeSection=="activities"?"active":"")"
+                    @onclick='()=>activeSection="activities"'>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Activities
+            </button>
+        </nav>
+
+        <!-- Footer: avatar + sign-out -->
+        <!-- FIX: POST to /Account/Logout with antiforgery token.
+             Identity's logout endpoint requires a POST — a plain GET href
+             is ignored by the scaffolded endpoint and the user stays logged in. -->
+        <div class="adm-footer">
+            <div class="adm-user-info">
+                <div class="adm-user-avatar">@GetInitials(adminName)</div>
+                <div style="min-width:0">
+                    <div class="adm-user-name">@adminName</div>
+                    <div class="adm-user-label">Admin</div>
+                </div>
+            </div>
+            <form method="post" action="/Account/Logout" style="width:100%;margin-top:0.5rem;">
+                <input type="hidden" name="returnUrl" value="/" />
+                <AntiforgeryToken />
+                <button type="submit" class="btn-signout">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Sign Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- ═══════════ MAIN ═══════════ -->
+    <div class="adm-main">
+
+        <!-- Top bar -->
+        <div class="adm-topbar">
+            <div>
+                <div class="adm-topbar-title">@SectionTitle</div>
+                <div class="adm-topbar-date">@DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
+            </div>
+        </div>
+
+        <div class="adm-body">
+
+            @if (!string.IsNullOrEmpty(globalMsg))
+            {
+                <div class="adm-alert @(globalMsgOk ? "adm-alert-ok" : "adm-alert-err")">
+                    @(globalMsgOk ? "✓" : "✕") @globalMsg
+                </div>
+            }
+
+            <!-- ═══════ DASHBOARD ═══════ -->
+            @if (activeSection == "dashboard")
+            {
+                @if (isLoading)
+                {
+                    <div class="state-box"><div class="state-icon">⏳</div><p>Loading dashboard…</p></div>
+                }
+                else
+                {
+                    <div class="kpi-grid">
+                        <div class="kpi-card k-gold">
+                            <div class="kpi-icon">👥</div>
+                            <div>
+                                <div class="kpi-value">@kpiUsers</div>
+                                <div class="kpi-label">Total Users</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card k-brown">
+                            <div class="kpi-icon">📋</div>
+                            <div>
+                                <div class="kpi-value">@kpiBookings</div>
+                                <div class="kpi-label">Total Bookings</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card k-green">
+                            <div class="kpi-icon">💰</div>
+                            <div>
+                                <div class="kpi-value">@kpiRevenue.ToString("N0")</div>
+                                <div class="kpi-label">Revenue (SR)</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card k-red">
+                            <div class="kpi-icon">📣</div>
+                            <div>
+                                <div class="kpi-value">@openComplaintsCount</div>
+                                <div class="kpi-label">Open Complaints</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="two-col">
+                        <!-- Recent Bookings -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Recent Bookings</span>
+                                <button class="btn-sm btn-primary" @onclick='()=>activeSection="bookings"'>View All</button>
+                            </div>
+                            <div class="panel-body">
+                                @if (!recentBookings.Any())
+                                {
+                                    <div class="state-box"><div class="state-icon">📭</div><p>No bookings yet.</p></div>
+                                }
+                                else
+                                {
+                                    <table class="data-table">
+                                        <thead><tr><th>Destination</th><th>Status</th><th>Amount</th></tr></thead>
+                                        <tbody>
+                                            @foreach (var b in recentBookings.Take(6))
+                                            {
+                                                <tr>
+                                                    <td style="font-weight:600;">@b.DestName</td>
+                                                    <td><span class="badge b-@b.Status">@b.Status</span></td>
+                                                    <td style="color:#7B3121;font-weight:600;">SR @b.TotalPrice.ToString("N0")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Open Complaints -->
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Open Complaints</span>
+                                <button class="btn-sm btn-primary" @onclick='()=>activeSection="complaints"'>View All</button>
+                            </div>
+                            <div class="panel-body">
+                                @{var openOnes = allComplaints.Where(x => x.Status == "Open").Take(6).ToList();}
+                                @if (!openOnes.Any())
+                                {
+                                    <div class="state-box"><div class="state-icon">🎉</div><p>No open complaints!</p></div>
+                                }
+                                else
+                                {
+                                    <table class="data-table">
+                                        <thead><tr><th>Category</th><th>Subject</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                            @foreach (var c in openOnes)
+                                            {
+                                                <tr>
+                                                    <td style="font-weight:600;">@c.Category</td>
+                                                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@c.Subject</td>
+                                                    <td><span class="badge @BadgeClass(c.Status)">@c.Status</span></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            <!-- ═══════ USERS ═══════ -->
+            @if (activeSection == "users")
+            {
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">All Users (@allUsers.Count)</span>
+                        <input class="search-bar" placeholder="Search by name or email…"
+                               @bind="userSearch" @bind:event="oninput" />
+                    </div>
+                    <div class="panel-body">
+                        @if (isLoadingUsers)
+                        {
+                            <div class="state-box"><div class="state-icon">⏳</div><p>Loading users…</p></div>
+                        }
+                        else
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var u in FilteredUsers)
+                                    {
+                                        var uv = u;
+                                        <tr>
+                                            <td style="font-weight:600;">@uv.FullName</td>
+                                            <td>@uv.Email</td>
+                                            <td><span class="badge @(uv.IsAdmin?"b-Admin":"b-User")">@(uv.IsAdmin?"Admin":"User")</span></td>
+                                            <td>@uv.JoinedAt.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                                                    @if (!uv.IsAdmin)
+                                                    {
+                                                        <button class="btn-sm btn-gold" @onclick="@(()=>PromoteUserAsync(uv))">Make Admin</button>
+                                                    }
+                                                    else if (uv.Id != currentAdminId)
+                                                    {
+                                                        <button class="btn-sm btn-danger" @onclick="@(()=>DemoteUserAsync(uv))">Remove Admin</button>
+                                                    }
+                                                    @if (uv.Id != currentAdminId)
+                                                    {
+                                                        <button class="btn-sm btn-danger" @onclick="@(()=>{ deleteTarget=uv; showDeleteUserModal=true; })">Delete</button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- ═══════ BOOKINGS ═══════ -->
+            @if (activeSection == "bookings")
+            {
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">All Bookings (@allAdminBookings.Count)</span>
+                        <select class="filter-select" @bind="bookingStatusFilter">
+                            <option value="All">All Statuses</option>
+                            <option>Confirmed</option>
+                            <option>Pending</option>
+                            <option>Completed</option>
+                            <option>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="panel-body">
+                        @if (isLoadingBookings)
+                        {
+                            <div class="state-box"><div class="state-icon">⏳</div><p>Loading bookings…</p></div>
+                        }
+                        else if (!FilteredBookings.Any())
+                        {
+                            <div class="state-box"><div class="state-icon">📭</div><p>No bookings found.</p></div>
+                        }
+                        else
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th><th>User</th><th>Destination</th><th>Dates</th>
+                                        <th>Travelers</th><th>Total (SR)</th><th>Status</th><th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var b in FilteredBookings)
+                                    {
+                                        var bv = b;
+                                        <tr>
+                                            <td style="color:#9A7060;">#@bv.Id</td>
+                                            <td>@bv.UserName</td>
+                                            <td style="font-weight:600;">@bv.DestName</td>
+                                            <td style="white-space:nowrap;">@bv.StartDate.ToString("dd MMM") – @bv.EndDate.ToString("dd MMM yy")</td>
+                                            <td>@bv.NumberOfTravelers</td>
+                                            <td style="color:#7B3121;font-weight:600;">@bv.TotalPrice.ToString("N0")</td>
+                                            <td><span class="badge b-@bv.Status">@bv.Status</span></td>
+                                            <td>
+                                                <select class="filter-select"
+                                                        style="padding:4px 8px;font-size:0.78rem;"
+                                                        value="@bv.Status"
+                                                        @onchange="@(e => UpdateBookingStatusAsync(bv, e.Value?.ToString() ?? bv.Status))">
+                                                    <option>Pending</option>
+                                                    <option>Confirmed</option>
+                                                    <option>Completed</option>
+                                                    <option>Cancelled</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- ═══════ COMPLAINTS ═══════ -->
+            @if (activeSection == "complaints")
+            {
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Complaints (@allComplaints.Count)</span>
+                        <select class="filter-select" @bind="complaintFilter">
+                            <option value="All">All Statuses</option>
+                            <option>Open</option>
+                            <option>In Progress</option>
+                            <option>Resolved</option>
+                            <option>Closed</option>
+                        </select>
+                    </div>
+                    <div class="panel-body">
+                        @if (isLoadingComplaints)
+                        {
+                            <div class="state-box"><div class="state-icon">⏳</div><p>Loading complaints…</p></div>
+                        }
+                        else if (!FilteredComplaints.Any())
+                        {
+                            <div class="state-box"><div class="state-icon">✅</div><p>No complaints found.</p></div>
+                        }
+                        else
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>User</th><th>Category</th><th>Subject</th><th>Description</th>
+                                        <th>Submitted</th><th>Status</th><th>Response</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var c in FilteredComplaints)
+                                    {
+                                        var cv = c;
+                                        <tr>
+                                            <td style="font-size:0.8rem;color:#7A5040;">@cv.UserName</td>
+                                            <td style="font-weight:600;">@cv.Category</td>
+                                            <td>@cv.Subject</td>
+                                            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9A7060;">@cv.Description</td>
+                                            <td style="white-space:nowrap;">@cv.CreatedAt.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                <select class="filter-select" style="padding:4px 8px;font-size:0.78rem;"
+                                                        value="@cv.Status"
+                                                        @onchange="@(async e => await UpdateComplaintStatusAsync(cv, e.Value?.ToString() ?? cv.Status))">
+                                                    <option>Open</option>
+                                                    <option>In Progress</option>
+                                                    <option>Resolved</option>
+                                                    <option>Closed</option>
+                                                </select>
+                                                <span class="badge @BadgeClass(cv.Status)" style="margin-top:4px;display:inline-block;">@cv.Status</span>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(cv.AdminResponse))
+                                                {
+                                                    <span style="color:#1A6B45;font-size:0.8rem;" title="@cv.AdminResponse">✓ Responded</span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="color:#9A7060;font-size:0.8rem;">—</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                                                    <button class="btn-sm btn-success"
+                                                            @onclick="@(()=>{ respondTarget=cv; respondText=cv.AdminResponse??""; showRespondModal=true; })">
+                                                        Respond
+                                                    </button>
+                                                    @if (cv.Status != "Resolved" && cv.Status != "Closed")
+                                                    {
+                                                        <button class="btn-sm btn-gold" @onclick="@(()=>QuickResolveAsync(cv))">
+                                                            ✓ Resolve
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- ═══════ DESTINATIONS ═══════ -->
+            @if (activeSection == "destinations")
+            {
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Destinations (@allDestinations.Count)</span>
+                        <button class="btn-sm btn-gold" @onclick="@(()=>showAddDestModal=true)">+ Add Destination</button>
+                    </div>
+                    <div class="panel-body">
+                        @if (isLoadingDests)
+                        {
+                            <div class="state-box"><div class="state-icon">⏳</div><p>Loading destinations…</p></div>
+                        }
+                        else if (!allDestinations.Any())
+                        {
+                            <div class="state-box"><div class="state-icon">🏜️</div><p>No destinations found.</p></div>
+                        }
+                        else
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th><th>Province</th><th>Rating</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var d in allDestinations)
+                                    {
+                                        var dv = d;
+                                        <tr>
+                                            <td style="font-weight:600;">@dv.Name</td>
+                                            <td>@dv.Province</td>
+                                            <td>@(dv.Rating > 0 ? dv.Rating.ToString("F1") + " ★" : "—")</td>
+                                            <td>
+                                                <div style="display:flex;gap:0.4rem;">
+                                                    <button class="btn-sm btn-primary"
+                                                            @onclick="@(()=>{ editDest=new DestVM{Id=dv.Id,Name=dv.Name,Province=dv.Province}; showEditDestModal=true; })">
+                                                        Edit
+                                                    </button>
+                                                    <button class="btn-sm btn-danger"
+                                                            @onclick="@(()=>{ deleteDestTarget=dv; showDeleteDestModal=true; })">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- ═══════ ACTIVITIES ═══════ -->
+            @if (activeSection == "activities")
+            {
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">All Activities</span>
+                        <button class="btn-sm btn-gold" @onclick="@(()=>showAddActivityModal=true)">+ Add Activity</button>
+                    </div>
+                    <div class="panel-body">
+                        @if (allActivities == null)
+                        {
+                            <div class="state-box"><p>Loading…</p></div>
+                        }
+                        else if (!allActivities.Any())
+                        {
+                            <div class="state-box">
+                                <div class="state-icon">🎯</div>
+                                <p>No activities found.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Category</th>
+                                        <th>Destination</th>
+                                        <th>Price (SR)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var act in allActivities)
+                                    {
+                                        var a = act;
+                                        <tr>
+                                            <td style="font-weight:600;">@a.Name</td>
+                                            <td>@a.Category</td>
+                                            <td>@(allDestinations.FirstOrDefault(d => d.Id == a.DestinationId)?.Name ?? "—")</td>
+                                            <td>@a.PriceSAR.ToString("N0")</td>
+                                            <td>
+                                                <div style="display:flex;gap:0.4rem;">
+                                                    <button class="btn-sm btn-primary"
+                                                            @onclick="@(()=>{ editActivity=new ActivityVM{DestinationId=a.DestinationId,Name=a.Name,Category=a.Category,Description=a.Description,PriceSAR=a.PriceSAR,DurationHours=a.DurationHours,Id=a.Id}; showEditActivityModal=true; })">
+                                                        Edit
+                                                    </button>
+                                                    <button class="btn-sm btn-danger"
+                                                            @onclick="@(()=>{ deleteActivityTarget=a; showDeleteActivityModal=true; })">
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
+        </div><!-- /adm-body -->
+    </div><!-- /adm-main -->
+</div><!-- /admin-root -->
+
+
+<!-- ══ MODAL: Delete User ══ -->
+@if (showDeleteUserModal && deleteTarget != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Delete User</h3>
+            <p>Permanently delete <strong>@deleteTarget.FullName</strong> (@deleteTarget.Email)? This cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showDeleteUserModal=false; deleteTarget=null; })">Cancel</button>
+                <button class="btn-sm btn-danger"  @onclick="ConfirmDeleteUserAsync">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Respond to Complaint ══ -->
+@if (showRespondModal && respondTarget != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box" style="max-width:520px;">
+            <h3>Respond to Complaint</h3>
+            <p style="margin-bottom:0.5rem;">
+                <strong>From:</strong> @respondTarget.UserName &nbsp;·&nbsp;
+                <strong>Category:</strong> @respondTarget.Category
+            </p>
+            <p style="margin-bottom:0.5rem;"><strong>@respondTarget.Subject</strong></p>
+            <p style="background:#F5EFE8;padding:0.75rem;border-radius:7px;font-size:0.83rem;color:#5A3A2A;margin-bottom:1rem;">
+                @respondTarget.Description
+            </p>
+            <textarea class="modal-textarea" placeholder="Type your response…" @bind="respondText"></textarea>
+            <select class="modal-select" @bind="respondTarget.Status">
+                <option>Open</option>
+                <option>In Progress</option>
+                <option>Resolved</option>
+                <option>Closed</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showRespondModal=false; respondTarget=null; })">Cancel</button>
+                <button class="btn-sm btn-success" @onclick="SubmitResponseAsync"
+                        disabled="@string.IsNullOrWhiteSpace(respondText)">Send Response</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Add Destination ══ -->
+@if (showAddDestModal)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Add Destination</h3>
+            <input class="modal-input" placeholder="Destination name" @bind="newDest.Name" />
+            <input class="modal-input" placeholder="Province / Region" @bind="newDest.Province" />
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>showAddDestModal=false)">Cancel</button>
+                <button class="btn-sm btn-gold"    @onclick="AddDestinationAsync">Add</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Edit Destination ══ -->
+@if (showEditDestModal && editDest != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Edit Destination</h3>
+            <input class="modal-input" placeholder="Name"             @bind="editDest.Name" />
+            <input class="modal-input" placeholder="Province / Region" @bind="editDest.Province" />
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showEditDestModal=false; editDest=null; })">Cancel</button>
+                <button class="btn-sm btn-gold"    @onclick="SaveEditDestAsync">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Delete Destination ══ -->
+@if (showDeleteDestModal && deleteDestTarget != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Delete Destination</h3>
+            <p>Permanently delete <strong>@deleteDestTarget.Name</strong>?</p>
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showDeleteDestModal=false; deleteDestTarget=null; })">Cancel</button>
+                <button class="btn-sm btn-danger"  @onclick="ConfirmDeleteDestAsync">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Add Activity ══ -->
+@if (showAddActivityModal)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Add Activity</h3>
+            <select class="modal-input" @bind="newActivity.DestinationId">
+                <option value="0">— Select Destination —</option>
+                @foreach (var d in allDestinations)
+                {
+                    <option value="@d.Id">@d.Name</option>
+                }
+            </select>
+            <input class="modal-input" placeholder="Activity name *"      @bind="newActivity.Name" />
+            <input class="modal-input" placeholder="Category (e.g. Adventure, Culture)" @bind="newActivity.Category" />
+            <input class="modal-input" placeholder="Description"          @bind="newActivity.Description" />
+            <input class="modal-input" placeholder="Price (SR)"           type="number" @bind="newActivity.PriceSAR" />
+            <input class="modal-input" placeholder="Duration (hours)"     type="number" @bind="newActivity.DurationHours" />
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showAddActivityModal=false; newActivity=new(); })">Cancel</button>
+                <button class="btn-sm btn-gold"    @onclick="AddActivityAsync">Add</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Edit Activity ══ -->
+@if (showEditActivityModal && editActivity != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Edit Activity</h3>
+            <select class="modal-input" @bind="editActivity.DestinationId">
+                <option value="0">— Select Destination —</option>
+                @foreach (var d in allDestinations)
+                {
+                    <option value="@d.Id">@d.Name</option>
+                }
+            </select>
+            <input class="modal-input" placeholder="Activity name *"                   @bind="editActivity.Name" />
+            <input class="modal-input" placeholder="Category (e.g. Adventure, Culture)" @bind="editActivity.Category" />
+            <input class="modal-input" placeholder="Description"                        @bind="editActivity.Description" />
+            <input class="modal-input" placeholder="Price (SR)"    type="number"        @bind="editActivity.PriceSAR" />
+            <input class="modal-input" placeholder="Duration (hours)" type="number"     @bind="editActivity.DurationHours" />
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showEditActivityModal=false; editActivity=null; })">Cancel</button>
+                <button class="btn-sm btn-gold"    @onclick="SaveEditActivityAsync">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ MODAL: Delete Activity ══ -->
+@if (showDeleteActivityModal && deleteActivityTarget != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Delete Activity</h3>
+            <p>Permanently delete <strong>@deleteActivityTarget.Name</strong>? This cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn-sm btn-primary" @onclick="@(()=>{ showDeleteActivityModal=false; deleteActivityTarget=null; })">Cancel</button>
+                <button class="btn-sm btn-danger"  @onclick="ConfirmDeleteActivityAsync">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ── State ──────────────────────────────────────────────
+    private string activeSection  = "dashboard";
+    private string adminName      = "Admin";
+    private string currentAdminId = "";
+    private bool   isLoading      = true;
+    private string globalMsg      = "";
+    private bool   globalMsgOk    = true;
+
+    // KPIs
+    private int     kpiUsers           = 0;
+    private int     kpiBookings        = 0;
+    private decimal kpiRevenue         = 0;
+    private int     openComplaintsCount = 0;
+
+    // Users
+    private bool         isLoadingUsers     = false;
+    private string       userSearch         = "";
+    private List<UserVM> allUsers           = new();
+    private UserVM?      deleteTarget;
+    private bool         showDeleteUserModal = false;
+
+    // Bookings
+    private bool         isLoadingBookings   = false;
+    private string       bookingStatusFilter = "All";
+    private List<BookVM> allAdminBookings    = new();
+    private List<BookVM> recentBookings      = new();
+
+    // Complaints
+    private bool               isLoadingComplaints = false;
+    private string             complaintFilter     = "All";
+    private List<ComplaintVM>  allComplaints       = new();
+    private ComplaintVM?       respondTarget;
+    private string             respondText         = "";
+    private bool               showRespondModal    = false;
+
+    private class ComplaintVM
+    {
+        public int      Id            { get; set; }
+        public string   UserId        { get; set; } = "";
+        public string   UserName      { get; set; } = "";   // resolved from UserManager
+        public string   Category      { get; set; } = "";
+        public string   Subject       { get; set; } = "";
+        public string   Description   { get; set; } = "";
+        public string   Status        { get; set; } = "Open";
+        public string?  AdminResponse { get; set; }
+        public DateTime CreatedAt     { get; set; }
+    }
+
+    // Destinations
+    private bool         isLoadingDests      = false;
+    private List<DestVM> allDestinations     = new();
+    private DestVM       newDest             = new();
+    private DestVM?      editDest;
+    private DestVM?      deleteDestTarget;
+    private bool         showAddDestModal    = false;
+    private bool         showEditDestModal   = false;
+    private bool         showDeleteDestModal = false;
+
+    // Activities
+    private List<Activity>? allActivities;
+    private ActivityVM      newActivity            = new();
+    private ActivityVM?     editActivity;
+    private Activity?       deleteActivityTarget;
+    private bool            showAddActivityModal    = false;
+    private bool            showEditActivityModal   = false;
+    private bool            showDeleteActivityModal = false;
+
+    private class ActivityVM
+    {
+        public int     Id             { get; set; }
+        public int     DestinationId  { get; set; }
+        public string  Name           { get; set; } = "";
+        public string  Category       { get; set; } = "";
+        public string  Description    { get; set; } = "";
+        public decimal PriceSAR       { get; set; }
+        public decimal DurationHours  { get; set; }
+    }
+
+    // ── View Models ───────────────────────────────────────
+    private class UserVM
+    {
+        public string   Id       { get; set; } = "";
+        public string   FullName { get; set; } = "";
+        public string   Email    { get; set; } = "";
+        public bool     IsAdmin  { get; set; }
+        public DateTime JoinedAt { get; set; }
+    }
+
+    private class BookVM
+    {
+        public int      Id                { get; set; }
+        public string   UserName          { get; set; } = "";
+        public string   DestName          { get; set; } = "";
+        public DateTime StartDate         { get; set; }
+        public DateTime EndDate           { get; set; }
+        public int      NumberOfTravelers { get; set; }
+        public decimal  TotalPrice        { get; set; }
+        public string   Status            { get; set; } = "Pending";
+    }
+
+    private class DestVM
+    {
+        public int    Id       { get; set; }
+        public string Name     { get; set; } = "";
+        public string Province { get; set; } = "";
+        public double Rating   { get; set; }
+    }
+
+    // ── Computed ──────────────────────────────────────────
+    private string SectionTitle => activeSection switch
+    {
+        "dashboard"    => "Dashboard",
+        "users"        => "User Management",
+        "bookings"     => "Bookings Management",
+        "complaints"   => "Complaints Management",
+        "destinations" => "Destinations Management",
+        "activities"   => "Activities Management",
+        _              => "Admin"
+    };
+
+    private IEnumerable<UserVM> FilteredUsers =>
+        string.IsNullOrWhiteSpace(userSearch)
+            ? allUsers
+            : allUsers.Where(u =>
+                u.FullName.Contains(userSearch, StringComparison.OrdinalIgnoreCase) ||
+                u.Email.Contains(userSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<BookVM> FilteredBookings =>
+        bookingStatusFilter == "All"
+            ? allAdminBookings
+            : allAdminBookings.Where(b => b.Status == bookingStatusFilter);
+
+    private IEnumerable<ComplaintVM> FilteredComplaints =>
+        complaintFilter == "All"
+            ? allComplaints
+            : allComplaints.Where(c => c.Status == complaintFilter);
+
+    // ── Lifecycle ─────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentAdminId = auth.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+        adminName      = auth.User.FindFirst(c => c.Type == ClaimTypes.Name)?.Value
+                      ?? auth.User.FindFirst(c => c.Type == ClaimTypes.Email)?.Value
+                      ?? "Admin";
+
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // Sequential — EF Core's DbContext is NOT thread-safe.
+            // Task.WhenAll with a shared DbContext causes silent data loss / exceptions.
+            await LoadUsersAsync();
+            await LoadBookingsAsync();
+            await LoadComplaintsAsync();
+            await LoadDestinationsAsync();
+            var acts = await ActivityService.GetAllAsync();
+            allActivities = acts.ToList();
+        }
+        catch (Exception ex)
+        {
+            SetMsg($"Dashboard load error: {ex.Message}", false);
+        }
+        finally { isLoading = false; }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        isLoadingUsers = true;
+        try
+        {
+            var users  = UserManager.Users.ToList();
+            var result = new List<UserVM>();
+            foreach (var u in users)
+            {
+                var roles = await UserManager.GetRolesAsync(u);
+                result.Add(new UserVM
+                {
+                    Id       = u.Id,
+                    FullName = u.FullName ?? u.Email ?? "",
+                    Email    = u.Email ?? "",
+                    IsAdmin  = roles.Contains("Admin"),
+                    JoinedAt = u.CreatedAt
+                });
+            }
+            allUsers = result.OrderByDescending(u => u.JoinedAt).ToList();
+            kpiUsers = allUsers.Count;
+        }
+        finally { isLoadingUsers = false; }
+    }
+
+    private async Task LoadBookingsAsync()
+    {
+        isLoadingBookings = true;
+        try
+        {
+            // GetAllBookingsAsync returns all bookings for admin.
+            // If your IBookingService has a different method name, adjust here.
+            var bookings = await BookingService.GetAllBookingsAsync();
+            allAdminBookings = bookings.Select(b => new BookVM
+            {
+                Id                = b.Id,
+                // Resolve the user's name from the UserId
+                UserName          = UserManager.Users
+                                        .Where(u => u.Id == b.UserId)
+                                        .Select(u => u.FullName ?? u.Email ?? b.UserId)
+                                        .FirstOrDefault() ?? b.UserId ?? "",
+                DestName          = b.Destination?.Name ?? $"Booking #{b.Id}",
+                StartDate         = b.StartDate,
+                EndDate           = b.EndDate,
+                NumberOfTravelers = b.NumberOfTravelers,
+                TotalPrice        = b.TotalPrice,
+                Status            = b.Status ?? "Pending"
+            }).OrderByDescending(b => b.StartDate).ToList();
+
+            recentBookings  = allAdminBookings.Take(10).ToList();
+            kpiBookings     = allAdminBookings.Count;
+            kpiRevenue      = allAdminBookings
+                                .Where(b => b.Status is "Confirmed" or "Completed")
+                                .Sum(b => b.TotalPrice);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Admin] Bookings load error: {ex.Message}");
+            // Non-fatal — show empty table
+        }
+        finally { isLoadingBookings = false; }
+    }
+
+    private async Task LoadComplaintsAsync()
+    {
+        isLoadingComplaints = true;
+        try
+        {
+            var complaints = await ComplaintService.GetAllComplaintsAsync();
+
+            // Build a user-id → display-name lookup from the already-loaded user list
+            // (avoids N+1 queries; falls back to UserId if user no longer exists)
+            var userMap = allUsers.ToDictionary(u => u.Id, u => u.FullName);
+
+            allComplaints = complaints
+                .OrderByDescending(c => c.CreatedAt)
+                .Select(c => new ComplaintVM
+                {
+                    Id            = c.Id,
+                    UserId        = c.UserId,
+                    UserName      = userMap.TryGetValue(c.UserId, out var n) ? n : c.UserId,
+                    Category      = c.Category,
+                    Subject       = c.Subject,
+                    Description   = c.Description,
+                    Status        = c.Status,
+                    AdminResponse = c.AdminResponse,
+                    CreatedAt     = c.CreatedAt,
+                }).ToList();
+
+            openComplaintsCount = allComplaints.Count(c => c.Status == "Open");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Admin] Complaints load error: {ex.Message}");
+        }
+        finally { isLoadingComplaints = false; }
+    }
+
+    private async Task LoadDestinationsAsync()
+    {
+        isLoadingDests = true;
+        try
+        {
+            var dests = await DestinationService.GetAllAsync();
+            allDestinations = dests.Select(d => new DestVM
+            {
+                Id       = d.Id,
+                Name     = d.Name,
+                Province = d.Province ?? "",
+                Rating   = d.Rating
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Admin] Destinations load error: {ex.Message}");
+        }
+        finally { isLoadingDests = false; }
+    }
+
+    // ── User actions ──────────────────────────────────────
+    private async Task PromoteUserAsync(UserVM u)
+    {
+        var appUser = await UserManager.FindByIdAsync(u.Id);
+        if (appUser == null) return;
+        if (!await RoleManager.RoleExistsAsync("Admin"))
+            await RoleManager.CreateAsync(new IdentityRole("Admin"));
+        await UserManager.AddToRoleAsync(appUser, "Admin");
+        u.IsAdmin = true;
+        SetMsg($"{u.FullName} promoted to Admin.", true);
+    }
+
+    private async Task DemoteUserAsync(UserVM u)
+    {
+        var appUser = await UserManager.FindByIdAsync(u.Id);
+        if (appUser == null) return;
+        await UserManager.RemoveFromRoleAsync(appUser, "Admin");
+        u.IsAdmin = false;
+        SetMsg($"{u.FullName} is now a regular User.", true);
+    }
+
+    private async Task ConfirmDeleteUserAsync()
+    {
+        if (deleteTarget == null) return;
+        var appUser = await UserManager.FindByIdAsync(deleteTarget.Id);
+        if (appUser != null)
+        {
+            var result = await UserManager.DeleteAsync(appUser);
+            if (result.Succeeded)
+            {
+                allUsers.Remove(deleteTarget);
+                kpiUsers--;
+                SetMsg($"User {deleteTarget.FullName} deleted.", true);
+            }
+            else
+            {
+                SetMsg(string.Join("; ", result.Errors.Select(e => e.Description)), false);
+            }
+        }
+        showDeleteUserModal = false;
+        deleteTarget = null;
+    }
+
+    // ── Booking actions ───────────────────────────────────
+    private async Task UpdateBookingStatusAsync(BookVM b, string newStatus)
+    {
+        try
+        {
+            // Persist status change — adjust method name to match your IBookingService
+            await BookingService.UpdateStatusAsync(b.Id, newStatus);
+            b.Status = newStatus;
+            // Recalculate revenue
+            kpiRevenue = allAdminBookings
+                .Where(x => x.Status is "Confirmed" or "Completed")
+                .Sum(x => x.TotalPrice);
+            SetMsg($"Booking #{b.Id} updated to {newStatus}.", true);
+        }
+        catch (Exception ex) { SetMsg(ex.Message, false); }
+    }
+
+    // ── Complaint actions ─────────────────────────────────
+    private async Task UpdateComplaintStatusAsync(ComplaintVM c, string newStatus)
+    {
+        try
+        {
+            await ComplaintService.UpdateStatusAsync(c.Id, newStatus);
+            c.Status            = newStatus;
+            openComplaintsCount = allComplaints.Count(x => x.Status == "Open");
+            StateHasChanged();
+            SetMsg("Complaint status updated.", true);
+        }
+        catch (Exception ex) { SetMsg(ex.Message, false); }
+    }
+
+    private async Task SubmitResponseAsync()
+    {
+        if (respondTarget == null) return;
+        try
+        {
+            await ComplaintService.RespondAsync(respondTarget.Id, respondText);
+            await ComplaintService.UpdateStatusAsync(respondTarget.Id, respondTarget.Status);
+            respondTarget.AdminResponse = respondText;
+            openComplaintsCount = allComplaints.Count(c => c.Status == "Open");
+            StateHasChanged();
+            SetMsg("Response sent successfully.", true);
+        }
+        catch (Exception ex) { SetMsg(ex.Message, false); }
+        finally { showRespondModal = false; respondTarget = null; }
+    }
+
+    private async Task QuickResolveAsync(ComplaintVM c)
+    {
+        try
+        {
+            await ComplaintService.ResolveAsync(c.Id);
+            c.Status            = "Resolved";
+            openComplaintsCount = allComplaints.Count(x => x.Status == "Open");
+            StateHasChanged();
+            SetMsg($"Complaint #{c.Id} marked as Resolved.", true);
+        }
+        catch (Exception ex) { SetMsg(ex.Message, false); }
+    }
+
+    // ── Destination actions ───────────────────────────────
+    private async Task AddDestinationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newDest.Name)) return;
+        try
+        {
+            await DestinationService.CreateAsync(new CreateDestinationDto(
+                Name        : newDest.Name,
+                Province    : newDest.Province ?? "",
+                Category    : "",
+                Description : "",
+                ImageUrl    : "",
+                Latitude    : 0,
+                Longitude   : 0,
+                Cost        : 0,
+                Climate     : "",
+                VisaInfo    : ""
+            ));
+            newDest = new DestVM();
+            showAddDestModal = false;
+            await LoadDestinationsAsync();
+            SetMsg("Destination added successfully.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to add destination: {ex.Message}", false); }
+    }
+
+    private async Task SaveEditDestAsync()
+    {
+        if (editDest == null) return;
+        try
+        {
+            await DestinationService.UpdateAsync(editDest.Id, new UpdateDestinationDto(
+                Name     : editDest.Name,
+                Province : editDest.Province ?? "",
+                Category    : null,
+                Description : null,
+                ImageUrl    : null,
+                Latitude    : null,
+                Longitude   : null,
+                Cost        : null,
+                Climate     : null,
+                VisaInfo    : null
+            ));
+            showEditDestModal = false;
+            editDest = null;
+            await LoadDestinationsAsync();
+            SetMsg("Destination updated successfully.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to update destination: {ex.Message}", false); }
+    }
+
+    private async Task ConfirmDeleteDestAsync()
+    {
+        if (deleteDestTarget == null) return;
+        try
+        {
+            await DestinationService.DeleteAsync(deleteDestTarget.Id);
+            showDeleteDestModal = false;
+            deleteDestTarget = null;
+            await LoadDestinationsAsync();
+            SetMsg("Destination deleted successfully.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to delete destination: {ex.Message}", false); }
+    }
+
+    // ── Sign out ──────────────────────────────────────────
+    // Removed SignOutAsync() — logout now uses <a href="/Account/Logout">
+    // which lets Identity's HTTP pipeline clear the auth cookie correctly.
+    // SignInManager.SignOutAsync() in InteractiveServer rendermode cannot
+    // write Set-Cookie headers after the SignalR connection is open.
+
+    // ── Activity actions ──────────────────────────────────
+    private async Task AddActivityAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newActivity.Name) || newActivity.DestinationId == 0) return;
+        try
+        {
+            await ActivityService.CreateAsync(new CreateActivityDto(
+                DestinationId : newActivity.DestinationId,
+                Name          : newActivity.Name.Trim(),
+                Description   : newActivity.Description.Trim(),
+                DurationHours : newActivity.DurationHours,
+                PriceSAR      : newActivity.PriceSAR,
+                Category      : newActivity.Category.Trim(),
+                ImageUrl      : ""
+            ));
+            var acts = await ActivityService.GetAllAsync();
+            allActivities = acts.ToList();
+            newActivity = new();
+            showAddActivityModal = false;
+            SetMsg("Activity added successfully.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to add activity: {ex.Message}", false); }
+    }
+
+    private async Task ConfirmDeleteActivityAsync()
+    {
+        if (deleteActivityTarget == null) return;
+        try
+        {
+            await ActivityService.DeleteAsync(deleteActivityTarget.Id);
+            allActivities?.Remove(deleteActivityTarget);
+            showDeleteActivityModal = false;
+            deleteActivityTarget = null;
+            SetMsg("Activity deleted.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to delete activity: {ex.Message}", false); }
+    }
+
+    private async Task SaveEditActivityAsync()
+    {
+        if (editActivity == null || string.IsNullOrWhiteSpace(editActivity.Name) || editActivity.DestinationId == 0) return;
+        try
+        {
+            await ActivityService.UpdateAsync(editActivity.Id, new UpdateActivityDto(
+                Name          : editActivity.Name.Trim(),
+                Description   : editActivity.Description.Trim(),
+                DurationHours : editActivity.DurationHours,
+                PriceSAR      : editActivity.PriceSAR,
+                Category      : editActivity.Category.Trim(),
+                ImageUrl      : null
+            ));
+            var acts = await ActivityService.GetAllAsync();
+            allActivities = acts.ToList();
+            showEditActivityModal = false;
+            editActivity = null;
+            SetMsg("Activity updated successfully.", true);
+        }
+        catch (Exception ex) { SetMsg($"Failed to update activity: {ex.Message}", false); }
+    }
+
+    // ── Helper ────────────────────────────────────────────
+    /// <summary>
+    /// Maps a status string to its CSS badge class.
+    /// Needed because "In Progress" contains a space which breaks class="b-@status".
+    /// </summary>
+    private static string BadgeClass(string status) => status switch
+    {
+        "In Progress" => "b-InProgress",
+        _             => $"b-{status}"
+    };
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "A";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return name[0].ToString().ToUpper();
+    }
+
+    private void SetMsg(string msg, bool ok)
+    {
+        globalMsg   = msg;
+        globalMsgOk = ok;
+        _ = Task.Delay(4000).ContinueWith(_ => { globalMsg = ""; InvokeAsync(StateHasChanged); });
+    }
+}

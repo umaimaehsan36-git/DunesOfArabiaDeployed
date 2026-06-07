@@ -1,0 +1,1064 @@
+@page "/settings"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@using DunesOfArabia.Data
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+@attribute [Authorize]
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser>  UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Nav
+@inject IComplaintService ComplaintService
+
+<PageTitle>Settings – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+
+    .settings-page {
+        background: #F5EFE8;
+        min-height: 100vh;
+        font-family: 'Lato', sans-serif;
+        padding: 2.2rem 2.2rem 4rem;
+        max-width: 760px;
+    }
+
+    .page-heading { margin-bottom: 1.8rem; }
+    .page-heading h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.9rem; color: #1C1008; font-weight: 700; margin-bottom: 0.2rem; }
+    .page-heading p  { font-size: 0.85rem; color: #8A7566; font-weight: 300; }
+
+    .settings-card {
+        background: white;
+        border-radius: 14px;
+        border: 1px solid #EAE0D8;
+        margin-bottom: 1.4rem;
+        overflow: hidden;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.06);
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        padding: 1.2rem 1.6rem;
+        border-bottom: 1px solid #F0E8DF;
+    }
+
+    .card-icon {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: #FAF0E8;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem; flex-shrink: 0;
+    }
+
+    .card-header-text h3 { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: #1C1008; font-weight: 700; margin-bottom: 0.1rem; }
+    .card-header-text p  { font-size: 0.78rem; color: #9A8878; font-weight: 300; }
+
+    .card-body { padding: 1.4rem 1.6rem; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 1rem; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { font-size: 0.8rem; font-weight: 600; color: #5A3A2A; }
+
+    .form-input {
+        padding: 9px 13px;
+        border: 1.5px solid #D8CCC4;
+        border-radius: 7px;
+        font-size: 0.86rem;
+        font-family: inherit;
+        color: #1C1008;
+        background: #FDFAF8;
+        transition: border-color 0.18s, box-shadow 0.18s;
+        outline: none;
+    }
+    .form-input:focus { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.08); }
+    .form-input:disabled { background: #F5EFE8; color: #9A8878; cursor: not-allowed; }
+
+    .form-select {
+        padding: 9px 13px;
+        border: 1.5px solid #D8CCC4;
+        border-radius: 7px;
+        font-size: 0.86rem;
+        font-family: inherit;
+        color: #1C1008;
+        background: #FDFAF8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237B3121' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 12px center;
+        appearance: none;
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.18s;
+    }
+    .form-select:focus { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.08); }
+
+    .section-divider { border: none; border-top: 1px solid #F0E8DF; margin: 1.2rem 0; }
+
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.9rem 0;
+        border-bottom: 1px solid #F5EFE8;
+    }
+    .toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .toggle-row:first-child { padding-top: 0; }
+    .toggle-label h4 { font-size: 0.88rem; font-weight: 600; color: #1C1008; margin-bottom: 2px; }
+    .toggle-label p  { font-size: 0.78rem; color: #9A8878; font-weight: 300; }
+
+    .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+        position: absolute; inset: 0;
+        background: #D8CCC4;
+        border-radius: 99px;
+        cursor: pointer;
+        transition: background 0.22s;
+    }
+    .toggle-track::before {
+        content: '';
+        position: absolute;
+        width: 18px; height: 18px;
+        left: 3px; top: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.22s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    input:checked + .toggle-track { background: #7B3121; }
+    input:checked + .toggle-track::before { transform: translateX(20px); }
+
+    .btn-primary {
+        padding: 10px 24px;
+        background: #7B3121; color: white;
+        border: none; border-radius: 7px;
+        font-size: 0.86rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #5C2218; }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-outline {
+        padding: 8px 20px;
+        background: white; color: #7B3121;
+        border: 1.5px solid #7B3121; border-radius: 7px;
+        font-size: 0.84rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: background 0.2s, color 0.2s;
+    }
+    .btn-outline:hover { background: #7B3121; color: white; }
+
+    .btn-danger {
+        padding: 9px 20px;
+        background: #C0392B; color: white;
+        border: none; border-radius: 7px;
+        font-size: 0.84rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: background 0.2s;
+    }
+    .btn-danger:hover { background: #96281B; }
+
+    .btn-row { display: flex; justify-content: flex-end; margin-top: 1.2rem; }
+
+    .alert {
+        padding: 10px 14px;
+        border-radius: 7px;
+        font-size: 0.83rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .alert-success { background: #E8F9F0; color: #1A7A42; border: 1px solid #C0E8D0; }
+    .alert-error   { background: #FEF0EE; color: #C0392B; border: 1px solid #F5C0B8; }
+    .alert-info    { background: #EEF4FF; color: #2255AA; border: 1px solid #C0D0F0; }
+
+    .danger-zone { border: 1px solid #F5C0B8 !important; }
+    .danger-title { font-size: 0.92rem; font-weight: 700; color: #C0392B; margin-bottom: 0.3rem; }
+    .danger-desc  { font-size: 0.82rem; color: #9A8878; margin-bottom: 1rem; }
+
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15,8,3,0.45);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+    }
+    .modal-box {
+        background: white;
+        border-radius: 14px;
+        padding: 2rem;
+        width: 100%; max-width: 420px;
+        box-shadow: 0 8px 32px rgba(15,8,3,0.18);
+    }
+    .modal-box h3 { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: #1C1008; margin-bottom: 0.5rem; }
+    .modal-box p  { font-size: 0.84rem; color: #7A6658; margin-bottom: 1.4rem; line-height: 1.6; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.7rem; }
+
+    .password-hint { font-size: 0.75rem; color: #B0A090; margin-top: 3px; }
+
+    @@media (max-width: 600px) {
+        .settings-page { padding: 1.4rem 1rem 3rem; }
+        .form-row { grid-template-columns: 1fr; }
+    }
+</style>
+
+<div class="settings-page">
+
+    <div class="page-heading">
+        <h1>Settings</h1>
+        <p>Manage your account preferences and settings</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:3rem; color:#9A8878;">Loading your settings…</div>
+    }
+    else
+    {
+
+    <!-- ══ ACCOUNT SETTINGS ══ -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">🔒</div>
+            <div class="card-header-text">
+                <h3>Account Settings</h3>
+                <p>Update your account information</p>
+            </div>
+        </div>
+        <div class="card-body">
+
+            @if (profileMsg != null)
+            {
+                <div class="alert @(profileSuccess ? "alert-success" : "alert-error")">
+                    @(profileSuccess ? "✓" : "✕") @profileMsg
+                </div>
+            }
+
+            <!-- FIX 1: First & Last name stored as claims, not jammed into UserName -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">First Name</label>
+                    <input class="form-input" @bind="firstName" placeholder="First name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name</label>
+                    <input class="form-input" @bind="lastName" placeholder="Last name" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input class="form-input" value="@userEmail" disabled
+                       title="Email cannot be changed here" />
+            </div>
+
+            <!-- FIX 2: Phone number field — guaranteed empty string, never null -->
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input class="form-input" @bind="phoneNumber" placeholder="+966 5X XXX XXXX" />
+            </div>
+
+            <!-- NATIONALITY — required for booking verification gate -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Nationality *</label>
+                    <select class="form-select" @bind="nationality">
+                        <option value="">— Select nationality —</option>
+                        <option value="Saudi">Saudi</option>
+                        <option value="Pakistani">Pakistani</option>
+                        <option value="Egyptian">Egyptian</option>
+                        <option value="Indian">Indian</option>
+                        <option value="Bangladeshi">Bangladeshi</option>
+                        <option value="Filipino">Filipino</option>
+                        <option value="Indonesian">Indonesian</option>
+                        <option value="Jordanian">Jordanian</option>
+                        <option value="Lebanese">Lebanese</option>
+                        <option value="Syrian">Syrian</option>
+                        <option value="Yemeni">Yemeni</option>
+                        <option value="American">American</option>
+                        <option value="British">British</option>
+                        <option value="Canadian">Canadian</option>
+                        <option value="Australian">Australian</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                        <option value="Turkish">Turkish</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input class="form-input" type="date" @bind="dateOfBirth" @bind:format="yyyy-MM-dd" />
+                </div>
+            </div>
+            <p style="font-size:0.76rem;color:#C8873A;margin:-0.5rem 0 1rem;">
+                ⚠️ Nationality and phone are required to unlock trip booking. <a href="/profile" style="color:#7B3121;font-weight:600;">View profile status →</a>
+            </p>
+
+            <hr class="section-divider" />
+            <p style="font-size:0.85rem; font-weight:600; color:#5A3A2A; margin-bottom:0.8rem;">Change Password <span style="font-weight:300; color:#9A8878;">(leave blank to keep current)</span></p>
+
+            @if (passwordMsg != null)
+            {
+                <div class="alert @(passwordSuccess ? "alert-success" : "alert-error")">
+                    @(passwordSuccess ? "✓" : "✕") @passwordMsg
+                </div>
+            }
+
+            <div class="form-group">
+                <label class="form-label">Current Password</label>
+                <input class="form-input" type="password" @bind="currentPassword" placeholder="Enter only if changing password" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input class="form-input" type="password" @bind="newPassword" placeholder="Min. 6 characters" />
+                <span class="password-hint">Must contain at least one digit.</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input class="form-input" type="password" @bind="confirmPassword" placeholder="Repeat new password" />
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-primary" @onclick="SaveAccountAsync" disabled="@isSavingProfile">
+                    @(isSavingProfile ? "Saving…" : "Save Changes")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ NOTIFICATIONS ══ -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">🔔</div>
+            <div class="card-header-text">
+                <h3>Notifications</h3>
+                <p>Manage how you receive notifications</p>
+            </div>
+        </div>
+        <div class="card-body">
+
+            @if (notifMsg != null)
+            {
+                <div class="alert @(notifSuccess ? "alert-success" : "alert-error")">
+                    @(notifSuccess ? "✓" : "✕") @notifMsg
+                </div>
+            }
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Email Notifications</h4>
+                    <p>Receive updates via email</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="notifEmail" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Booking Confirmations</h4>
+                    <p>Get notified when bookings are confirmed</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="notifBooking" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Trip Reminders</h4>
+                    <p>Receive reminders before your trips</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="notifReminders" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Promotional Emails</h4>
+                    <p>Receive special offers and promotions</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="notifPromo" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Newsletter</h4>
+                    <p>Subscribe to our travel newsletter</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="notifNewsletter" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-primary" @onclick="SaveNotificationsAsync" disabled="@isSavingNotif">
+                    @(isSavingNotif ? "Saving…" : "Save Preferences")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ PREFERENCES ══ -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">⚙️</div>
+            <div class="card-header-text">
+                <h3>Preferences</h3>
+                <p>Customize your experience</p>
+            </div>
+        </div>
+        <div class="card-body">
+
+            @if (prefMsg != null)
+            {
+                <div class="alert @(prefSuccess ? "alert-success" : "alert-error")">
+                    @(prefSuccess ? "✓" : "✕") @prefMsg
+                </div>
+            }
+
+            <!-- FIX 5: Language note — claim is saved; full app-wide locale 
+                 switching requires CultureInfo middleware. This saves the preference. -->
+            <div class="form-group">
+                <label class="form-label">Language</label>
+                <select class="form-select" @bind="prefLanguage">
+                    <option value="en">English</option>
+                    <option value="ar">Arabic (العربية)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Currency</label>
+                <select class="form-select" @bind="prefCurrency">
+                    <option value="SAR">SAR (﷼)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Timezone</label>
+                <select class="form-select" @bind="prefTimezone">
+                    <option value="AST">Riyadh (GMT+3)</option>
+                    <option value="UTC">UTC (GMT+0)</option>
+                    <option value="EST">Eastern (GMT-5)</option>
+                    <option value="PST">Pacific (GMT-8)</option>
+                </select>
+            </div>
+
+            <hr class="section-divider" />
+
+            <div class="toggle-row" style="border-bottom:none; padding-bottom:0;">
+                <div class="toggle-label">
+                    <h4>Show Distance in</h4>
+                    <p>Choose your preferred unit</p>
+                </div>
+                <select class="form-select" style="width:140px;" @bind="prefDistanceUnit">
+                    <option value="km">Kilometers</option>
+                    <option value="mi">Miles</option>
+                </select>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-primary" @onclick="SavePreferencesAsync" disabled="@isSavingPref">
+                    @(isSavingPref ? "Saving…" : "Save Preferences")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ PRIVACY & SECURITY ══ -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">🔐</div>
+            <div class="card-header-text">
+                <h3>Privacy &amp; Security</h3>
+                <p>Control your privacy settings</p>
+            </div>
+        </div>
+        <div class="card-body">
+
+            @if (privacyMsg != null)
+            {
+                <div class="alert @(privacySuccess ? "alert-success" : "alert-error")">
+                    @(privacySuccess ? "✓" : "✕") @privacyMsg
+                </div>
+            }
+
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Profile Visibility</h4>
+                    <p>Make your profile visible to others</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="privacyProfileVisible" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Show Travel History</h4>
+                    <p>Display places you've visited</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" @bind="privacyShowHistory" />
+                    <span class="toggle-track"></span>
+                </label>
+            </div>
+
+            <!-- FIX 4: 2FA — show informational note instead of silently failing -->
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    <h4>Two-Factor Authentication</h4>
+                    <p>Add an extra layer of security</p>
+                </div>
+                <span style="font-size:0.8rem; color:#9A8878; font-style:italic;">
+                    @(twoFactorEnabled ? "Enabled" : "Not enabled")
+                </span>
+            </div>
+            @if (show2FANote)
+            {
+                <div class="alert alert-info" style="margin-top:0.5rem;">
+                    ℹ️ Full 2FA setup requires an authenticator app (TOTP). Please use the dedicated setup flow.
+                </div>
+            }
+
+            <div class="btn-row">
+                <button class="btn-primary" @onclick="SavePrivacyAsync" disabled="@isSavingPrivacy">
+                    @(isSavingPrivacy ? "Saving…" : "Save Settings")
+                </button>
+            </div>
+
+            <hr class="section-divider" />
+
+            <div class="danger-title">Delete Account</div>
+            <div class="danger-desc">Permanently delete your account and all associated data. This action cannot be undone.</div>
+            <button class="btn-danger" @onclick="() => showDeleteModal = true">Delete Account</button>
+        </div>
+    </div>
+
+    }
+
+    <!-- ══ HELP & FEEDBACK ══ -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">💬</div>
+            <div class="card-header-text">
+                <h3>Help &amp; Feedback</h3>
+                <p>Report an issue or send us your feedback</p>
+            </div>
+        </div>
+        <div class="card-body">
+            @if (complaintMsg != null)
+            {
+                <div class="alert @(complaintSuccess ? "alert-success" : "alert-error")">@complaintMsg</div>
+            }
+            <div class="form-group">
+                <label class="form-label">Issue Type *</label>
+                <select class="form-select" @bind="complaintType">
+                    <option value="">— Select —</option>
+                    <option>Booking Issue</option>
+                    <option>Payment Problem</option>
+                    <option>App Bug</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Subject *</label>
+                <input class="form-input" @bind="complaintSubject" placeholder="Brief summary" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description *</label>
+                <textarea class="form-input" @bind="complaintDescription" placeholder="Describe the issue..." style="min-height:100px;resize:vertical;"></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn-primary" @onclick="SubmitComplaintAsync" disabled="@isSavingComplaint">
+                    @(isSavingComplaint ? "Submitting…" : "Submit Feedback")
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ══ DELETE ACCOUNT CONFIRMATION MODAL ══ -->
+@if (showDeleteModal)
+{
+    <div class="modal-backdrop" @onclick="() => showDeleteModal = false">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <h3>⚠️ Delete Account</h3>
+            <p>
+                This will permanently delete your account, bookings, reviews, and all associated data.
+                Please enter your password to confirm.
+            </p>
+            @if (deleteErrorMsg != null)
+            {
+                <div class="alert alert-error" style="margin-bottom:1rem;">✕ @deleteErrorMsg</div>
+            }
+            <div class="form-group" style="margin-bottom:1.2rem;">
+                <label class="form-label">Confirm Password</label>
+                <input class="form-input" type="password" @bind="deleteConfirmPassword" placeholder="Your current password" />
+            </div>
+            <div class="modal-actions">
+                <button class="btn-outline" @onclick="() => { showDeleteModal = false; deleteConfirmPassword = string.Empty; deleteErrorMsg = null; }">
+                    Cancel
+                </button>
+                <button class="btn-danger" @onclick="DeleteAccountAsync" disabled="@isDeletingAccount">
+                    @(isDeletingAccount ? "Deleting…" : "Yes, Delete My Account")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ── User identity ─────────────────────────────────────────────────────
+    private ApplicationUser? appUser;
+    private string userId    = "";
+    private string userEmail = "";
+    private bool   isLoading = true;
+
+    private Dictionary<string, string> _claims = new();
+
+    // ── Account fields ────────────────────────────────────────────────────
+    private string    firstName       = "";
+    private string    lastName        = "";
+    private string    phoneNumber     = "";
+    private string    nationality     = "";
+    private DateTime? dateOfBirth;
+    private string currentPassword = "";
+    private string newPassword     = "";
+    private string confirmPassword = "";
+
+    private bool    isSavingProfile = false;
+    private string? profileMsg;
+    private bool    profileSuccess;
+    private string? passwordMsg;
+    private bool    passwordSuccess;
+
+    // ── Notification toggles ──────────────────────────────────────────────
+    private bool notifEmail      = true;
+    private bool notifBooking    = true;
+    private bool notifReminders  = true;
+    private bool notifPromo      = false;
+    private bool notifNewsletter = false;
+
+    private bool    isSavingNotif = false;
+    private string? notifMsg;
+    private bool    notifSuccess;
+
+    // ── Preferences ───────────────────────────────────────────────────────
+    private string prefLanguage     = "en";
+    private string prefCurrency     = "SAR";
+    private string prefTimezone     = "AST";
+    private string prefDistanceUnit = "km";
+
+    private bool    isSavingPref = false;
+    private string? prefMsg;
+    private bool    prefSuccess;
+
+    // ── Privacy ───────────────────────────────────────────────────────────
+    private bool privacyProfileVisible = true;
+    private bool privacyShowHistory    = true;
+    private bool twoFactorEnabled      = false;
+    private bool show2FANote           = false;
+
+    private bool    isSavingPrivacy = false;
+    private string? privacyMsg;
+    private bool    privacySuccess;
+
+    // ── Delete modal ──────────────────────────────────────────────────────
+    private bool    showDeleteModal       = false;
+    private string  deleteConfirmPassword = "";
+    private string? deleteErrorMsg;
+    private bool    isDeletingAccount     = false;
+
+    // ─────────────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+        appUser = await UserManager.FindByIdAsync(userId);
+        if (appUser is null) { Nav.NavigateTo("/Account/Login"); return; }
+
+        var rawClaims = await UserManager.GetClaimsAsync(appUser);
+        _claims = rawClaims
+            .GroupBy(c => c.Type)
+            .ToDictionary(g => g.Key, g => g.Last().Value);
+
+        // ── FIX 1: Load first/last name — FullName column is the source of truth ──
+        // On first login, claims may not exist yet. Split FullName first; fall back
+        // to splitting UserName (the email prefix) only as a last resort.
+        firstName = GetStringClaim("first_name", "");
+        lastName  = GetStringClaim("last_name",  "");
+
+        if (string.IsNullOrWhiteSpace(firstName) && !string.IsNullOrWhiteSpace(appUser.FullName))
+        {
+            var parts = appUser.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            firstName = parts.Length > 0 ? parts[0] : appUser.FullName;
+            lastName  = parts.Length > 1 ? parts[1] : "";
+        }
+
+        if (string.IsNullOrWhiteSpace(firstName))
+        {
+            var displayName = appUser.UserName ?? "";
+            var parts = displayName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            firstName = parts.Length > 0 ? parts[0] : displayName;
+            lastName  = parts.Length > 1 ? parts[1] : "";
+        }
+
+        // ── FIX 2: Phone — guard against null explicitly ──────────────────
+        userEmail   = appUser.Email ?? "";
+        phoneNumber = appUser.PhoneNumber ?? "";   // guaranteed string, never null
+
+        // ── Nationality & date of birth (required for booking gate) ───────
+        nationality = GetStringClaim("nationality", "");
+        var dobStr  = GetStringClaim("date_of_birth", "");
+        if (!string.IsNullOrEmpty(dobStr) && DateTime.TryParse(dobStr, out var dob)) dateOfBirth = dob;
+
+        // ── Notifications ─────────────────────────────────────────────────
+        notifEmail      = GetBoolClaim("notif_email",      true);
+        notifBooking    = GetBoolClaim("notif_booking",    true);
+        notifReminders  = GetBoolClaim("notif_reminders",  true);
+        notifPromo      = GetBoolClaim("notif_promo",      false);
+        notifNewsletter = GetBoolClaim("notif_newsletter", false);
+
+        // ── Preferences ───────────────────────────────────────────────────
+        prefLanguage     = GetStringClaim("pref_language", "en");
+        prefCurrency     = GetStringClaim("pref_currency", "SAR");
+        prefTimezone     = GetStringClaim("pref_timezone", "AST");
+        prefDistanceUnit = GetStringClaim("pref_distance", "km");
+
+        // ── Privacy ───────────────────────────────────────────────────────
+        privacyProfileVisible = GetBoolClaim("priv_visible", true);
+        privacyShowHistory    = GetBoolClaim("priv_history",  true);
+        twoFactorEnabled      = appUser.TwoFactorEnabled;
+
+        isLoading = false;
+    }
+
+    // ── Save account info + optional password change ──────────────────────
+    private async Task SaveAccountAsync()
+    {
+        isSavingProfile = true;
+        profileMsg  = null;
+        passwordMsg = null;
+        StateHasChanged();
+
+        try
+        {
+            // ── FIX 1: Store first & last name as claims AND sync FullName ──
+            // UserName must be unique and is set to email — never overwrite it.
+            // Claims hold the display name; FullName on ApplicationUser is the
+            // authoritative column read by Profile.razor via UserManager.
+            await SetClaimAsync("first_name", firstName.Trim());
+            await SetClaimAsync("last_name",  lastName.Trim());
+
+            var fullName = (firstName.Trim() + " " + lastName.Trim()).Trim();
+            if (appUser!.FullName != fullName)
+            {
+                appUser.FullName = fullName;
+                await UserManager.UpdateAsync(appUser);
+            }
+
+            // ── Nationality & date of birth (booking gate requirements) ───
+            if (!string.IsNullOrWhiteSpace(nationality))
+                await SetClaimAsync("nationality", nationality.Trim());
+            if (dateOfBirth.HasValue)
+                await SetClaimAsync("date_of_birth", dateOfBirth.Value.ToString("yyyy-MM-dd"));
+
+            // ── FIX 2+3: Save phone number via the proper Identity API ──────
+            // Direct appUser.PhoneNumber = value works but doesn't update the
+            // security stamp. SetPhoneNumberAsync is the correct method, and
+            // it calls UpdateAsync internally, so we only need UpdateAsync as
+            // a fallback for non-phone fields.
+            var trimmedPhone = phoneNumber.Trim();
+            if (appUser!.PhoneNumber != trimmedPhone)
+            {
+                var phoneResult = await UserManager.SetPhoneNumberAsync(appUser, trimmedPhone);
+                if (!phoneResult.Succeeded)
+                {
+                    profileMsg    = string.Join("; ", phoneResult.Errors.Select(e => e.Description));
+                    profileSuccess = false;
+                    isSavingProfile = false;
+                    return;
+                }
+            }
+
+            profileMsg    = "Profile updated successfully.";
+            profileSuccess = true;
+
+            // FIX 3: Reissue the auth cookie so the new phone_number / nationality
+            // claims are visible immediately — without this the profile gate on
+            // Profile.razor still shows them as incomplete until the user logs out.
+            await SignInManager.RefreshSignInAsync(appUser);
+
+            // ── FIX 3: Only attempt password change when ALL three fields
+            //           are non-empty — avoids spurious "enter password" error
+            //           when user is only updating name/phone. ─────────────
+            bool hasCurrentPw = !string.IsNullOrWhiteSpace(currentPassword);
+            bool hasNewPw     = !string.IsNullOrWhiteSpace(newPassword);
+            bool hasConfirmPw = !string.IsNullOrWhiteSpace(confirmPassword);
+
+            if (hasCurrentPw || hasNewPw || hasConfirmPw)
+            {
+                // At least one field touched → validate all three
+                if (!hasCurrentPw)
+                {
+                    passwordMsg    = "Please enter your current password.";
+                    passwordSuccess = false;
+                }
+                else if (!hasNewPw)
+                {
+                    passwordMsg    = "Please enter a new password.";
+                    passwordSuccess = false;
+                }
+                else if (!hasConfirmPw || newPassword != confirmPassword)
+                {
+                    passwordMsg    = "New passwords do not match.";
+                    passwordSuccess = false;
+                }
+                else
+                {
+                    var pwResult = await UserManager.ChangePasswordAsync(appUser, currentPassword, newPassword);
+                    if (pwResult.Succeeded)
+                    {
+                        passwordMsg    = "Password changed successfully.";
+                        passwordSuccess = true;
+                        currentPassword = "";
+                        newPassword     = "";
+                        confirmPassword = "";
+                        await SignInManager.RefreshSignInAsync(appUser);
+                    }
+                    else
+                    {
+                        passwordMsg    = string.Join("; ", pwResult.Errors.Select(e => e.Description));
+                        passwordSuccess = false;
+                    }
+                }
+            }
+            // If all three password fields are empty → skip silently (user just updated name/phone)
+        }
+        catch (Exception ex)
+        {
+            profileMsg    = $"An error occurred: {ex.Message}";
+            profileSuccess = false;
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    // ── Save notification preferences ────────────────────────────────────
+    private async Task SaveNotificationsAsync()
+    {
+        isSavingNotif = true;
+        notifMsg = null;
+        StateHasChanged();
+
+        try
+        {
+            await SetClaimAsync("notif_email",      notifEmail.ToString());
+            await SetClaimAsync("notif_booking",    notifBooking.ToString());
+            await SetClaimAsync("notif_reminders",  notifReminders.ToString());
+            await SetClaimAsync("notif_promo",      notifPromo.ToString());
+            await SetClaimAsync("notif_newsletter", notifNewsletter.ToString());
+
+            notifMsg    = "Notification preferences saved.";
+            notifSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            notifMsg    = $"Failed to save: {ex.Message}";
+            notifSuccess = false;
+        }
+        finally { isSavingNotif = false; }
+    }
+
+    // ── Save UI preferences ───────────────────────────────────────────────
+    // FIX 5: Preferences are saved as claims correctly.
+    // For language to affect the entire UI you also need Blazor culture
+    // middleware (app.UseRequestLocalization). The claim is the source of
+    // truth; wire it up in Program.cs with a CultureMiddleware or by
+    // reading this claim in _Host / App.razor and setting CultureInfo.
+    private async Task SavePreferencesAsync()
+    {
+        isSavingPref = true;
+        prefMsg = null;
+        StateHasChanged();
+
+        try
+        {
+            await SetClaimAsync("pref_language", prefLanguage);
+            await SetClaimAsync("pref_currency", prefCurrency);
+            await SetClaimAsync("pref_timezone", prefTimezone);
+            await SetClaimAsync("pref_distance", prefDistanceUnit);
+
+            prefMsg    = "Preferences saved.";
+            prefSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            prefMsg    = $"Failed to save: {ex.Message}";
+            prefSuccess = false;
+        }
+        finally { isSavingPref = false; }
+    }
+
+    // ── Save privacy settings ─────────────────────────────────────────────
+    private async Task SavePrivacyAsync()
+    {
+        isSavingPrivacy = true;
+        privacyMsg = null;
+        StateHasChanged();
+
+        try
+        {
+            await SetClaimAsync("priv_visible", privacyProfileVisible.ToString());
+            await SetClaimAsync("priv_history", privacyShowHistory.ToString());
+
+            privacyMsg    = "Privacy settings saved.";
+            privacySuccess = true;
+        }
+        catch (Exception ex)
+        {
+            privacyMsg    = $"Failed to save: {ex.Message}";
+            privacySuccess = false;
+        }
+        finally { isSavingPrivacy = false; }
+    }
+
+    // ── FIX 4: 2FA — removed the broken toggle.
+    //   Enabling 2FA via Identity requires generating a TOTP secret,
+    //   showing a QR code, and verifying a code from the authenticator app
+    //   before SetTwoFactorEnabledAsync(true) is valid.
+    //   Simply calling SetTwoFactorEnabledAsync(true) without that flow
+    //   always fails (or silently does nothing) unless the user already
+    //   has an authenticator key registered.
+    //   The UI now shows the current status as read-only text and a note.
+    //   Implement a proper /account/enable-authenticator page for full TOTP.
+    // ─────────────────────────────────────────────────────────────────────
+
+    // ── Delete account ────────────────────────────────────────────────────
+    private async Task DeleteAccountAsync()
+    {
+        if (appUser is null) return;
+        isDeletingAccount = true;
+        deleteErrorMsg = null;
+        StateHasChanged();
+
+        try
+        {
+            var passwordOk = await UserManager.CheckPasswordAsync(appUser, deleteConfirmPassword);
+            if (!passwordOk)
+            {
+                deleteErrorMsg    = "Incorrect password. Please try again.";
+                isDeletingAccount = false;
+                return;
+            }
+
+            var result = await UserManager.DeleteAsync(appUser);
+            if (result.Succeeded)
+            {
+                await SignInManager.SignOutAsync();
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                deleteErrorMsg    = string.Join("; ", result.Errors.Select(e => e.Description));
+                isDeletingAccount = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            deleteErrorMsg    = $"An error occurred: {ex.Message}";
+            isDeletingAccount = false;
+        }
+    }
+
+    // ── Claim helpers ─────────────────────────────────────────────────────
+    private async Task SetClaimAsync(string type, string value)
+    {
+        if (appUser is null) return;
+        var existing = await UserManager.GetClaimsAsync(appUser);
+        var old      = existing.FirstOrDefault(c => c.Type == type);
+        var newClaim = new System.Security.Claims.Claim(type, value);
+
+        if (old != null)
+            await UserManager.ReplaceClaimAsync(appUser, old, newClaim);
+        else
+            await UserManager.AddClaimAsync(appUser, newClaim);
+
+        // Keep local cache in sync
+        _claims[type] = value;
+    }
+
+    private bool GetBoolClaim(string type, bool defaultValue)
+    {
+        if (_claims.TryGetValue(type, out var val))
+            return val.Equals("True", StringComparison.OrdinalIgnoreCase);
+        return defaultValue;
+    }
+
+    private string GetStringClaim(string type, string defaultValue)
+        => _claims.TryGetValue(type, out var val) ? val : defaultValue;
+
+    // ── Complaint / Help & Feedback (sir's requirement) ─────────────────
+    private string  complaintType        = "";
+    private string  complaintSubject     = "";
+    private string  complaintDescription = "";
+    private bool    isSavingComplaint    = false;
+    private string? complaintMsg;
+    private bool    complaintSuccess;
+
+    private async Task SubmitComplaintAsync()
+    {
+        complaintMsg = null;
+
+        if (string.IsNullOrWhiteSpace(complaintType))
+        { complaintMsg = "Please select an issue type."; complaintSuccess = false; return; }
+
+        if (string.IsNullOrWhiteSpace(complaintSubject))
+        { complaintMsg = "Please enter a subject."; complaintSuccess = false; return; }
+
+        if (string.IsNullOrWhiteSpace(complaintDescription))
+        { complaintMsg = "Please describe your issue."; complaintSuccess = false; return; }
+
+        isSavingComplaint = true;
+        StateHasChanged();
+
+        try
+        {
+            await ComplaintService.SubmitComplaintAsync(new Complaint
+            {
+                UserId      = userId,
+                Category    = complaintType,
+                Subject     = complaintSubject,
+                Description = complaintDescription,
+                Message     = complaintDescription,   // kept for backwards compatibility
+            });
+            complaintMsg        = "✅ Your feedback has been submitted. We respond within 24 hours.";
+            complaintSuccess    = true;
+            complaintType       = "";
+            complaintSubject    = "";
+            complaintDescription = "";
+        }
+        catch (Exception ex)
+        {
+            complaintMsg    = $"Failed to submit: {ex.Message}";
+            complaintSuccess = false;
+        }
+        finally { isSavingComplaint = false; }
+    }
+
+
+}

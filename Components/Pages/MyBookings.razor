@@ -1,0 +1,467 @@
+@page "/bookings"
+@page "/my-bookings"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+
+@attribute [Authorize]
+
+@inject IBookingService BookingService
+@inject IDestinationService DestinationService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>My Bookings – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+    .bookings-page { padding: 2rem; background: #F5EFE8; min-height: 100vh; font-family: 'DM Sans', sans-serif; }
+
+    .page-header { margin-bottom: 1.8rem; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; color: #1C0F07; font-weight: 700; margin: 0 0 0.25rem; }
+    .page-header p  { color: #9A7060; font-size: 0.9rem; }
+
+    /* Filter + search bar */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1.5rem; }
+    .filter-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .filter-btn {
+        border: 1.5px solid #D4C4B0; background: white; color: #7B3121;
+        padding: 7px 16px; border-radius: 20px; cursor: pointer;
+        font-size: 0.86rem; font-weight: 500; font-family: inherit;
+        transition: all .2s;
+    }
+    .filter-btn.active { background: #7B3121; color: white; border-color: #7B3121; }
+    .filter-btn:hover:not(.active) { border-color: #7B3121; }
+
+    .search-input {
+        padding: 8px 14px; border: 1.5px solid #D4C4B0;
+        border-radius: 20px; font-size: 0.86rem;
+        background: white; color: #1C0F07; font-family: inherit;
+        width: 200px; transition: border-color 0.2s;
+    }
+    .search-input:focus { outline: none; border-color: #7B3121; }
+    .search-input::placeholder { color: #BBA898; }
+
+    /* Summary strip */
+    .summary-strip {
+        display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+    }
+    .summary-cell {
+        background: white; border-radius: 10px;
+        padding: 0.8rem 1.2rem; font-size: 0.85rem;
+        color: #7A5540; border: 1px solid #EAE0D8;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .summary-cell strong { color: #7B3121; font-size: 1rem; }
+
+    /* Booking card */
+    .booking-card {
+        background: white; border-radius: 14px; overflow: hidden;
+        margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        display: flex; border: 1px solid #EAE0D8;
+        transition: box-shadow 0.2s;
+    }
+    .booking-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+    .booking-img { width: 160px; min-height: 140px; object-fit: cover; flex-shrink: 0; }
+    .booking-body {
+        padding: 1.2rem 1.5rem; flex: 1;
+        display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .booking-top  { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+    .booking-title { font-size: 1.1rem; font-weight: 700; color: #1C0F07; font-family: 'Playfair Display', serif; }
+    .booking-ref  { font-size: 0.75rem; color: #BBA898; margin-top: 2px; }
+
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+    .st-Confirmed { background: #E6F4EA; color: #2E7D32; }
+    .st-Pending   { background: #FFF8E1; color: #F57F17; }
+    .st-Completed { background: #E3F2FD; color: #1565C0; }
+    .st-Cancelled { background: #FCE4EC; color: #C62828; }
+
+    .booking-meta { display: flex; gap: 1.2rem; margin-top: 0.6rem; font-size: 0.84rem; color: #7A5540; flex-wrap: wrap; }
+    .meta-item    { display: flex; align-items: center; gap: 0.3rem; }
+
+    .booking-actions { display: flex; gap: 0.5rem; margin-top: 0.9rem; flex-wrap: wrap; }
+    .btn-view   { background: #7B3121; color: white; border: none; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-family: inherit; transition: background 0.2s; }
+    .btn-view:hover { background: #5C2009; }
+    .btn-receipt { background: white; color: #7B3121; border: 1.5px solid #7B3121; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-family: inherit; transition: all 0.2s; }
+    .btn-receipt:hover { background: #F5EFE8; }
+    .btn-cancel { background: white; color: #C62828; border: 1.5px solid #C62828; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 0.82rem; font-family: inherit; transition: all 0.2s; }
+    .btn-cancel:hover:not(:disabled) { background: #FEF2F2; }
+    .btn-cancel:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Cancel confirmation modal */
+    .modal-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(10,5,3,0.5);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 100;
+    }
+    .modal-box {
+        background: white; border-radius: 16px;
+        padding: 2rem; width: 100%; max-width: 420px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    }
+    .modal-box h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; color: #1C0F07; margin-bottom: 0.5rem; }
+    .modal-box p  { font-size: 0.88rem; color: #7A5540; margin-bottom: 1.4rem; line-height: 1.6; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+    .btn-modal-cancel { background: white; color: #7A5540; border: 1.5px solid #D4C4B0; padding: 9px 20px; border-radius: 7px; cursor: pointer; font-family: inherit; font-size: 0.88rem; }
+    .btn-modal-confirm { background: #C62828; color: white; border: none; padding: 9px 20px; border-radius: 7px; cursor: pointer; font-family: inherit; font-size: 0.88rem; font-weight: 600; }
+    .btn-modal-confirm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Receipt modal */
+    .receipt-box {
+        background: white; border-radius: 16px;
+        width: 100%; max-width: 480px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+        overflow: hidden;
+    }
+    .receipt-header {
+        background: linear-gradient(135deg, #7B3121, #C8873A);
+        padding: 1.5rem 2rem; color: white;
+    }
+    .receipt-header h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; margin: 0 0 0.25rem; }
+    .receipt-header p  { font-size: 0.8rem; opacity: 0.8; margin: 0; }
+    .receipt-body { padding: 1.5rem 2rem; }
+    .receipt-row  { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #F0E8DC; font-size: 0.88rem; }
+    .receipt-row:last-child { border-bottom: none; }
+    .receipt-label { color: #7A5540; }
+    .receipt-value { color: #1C0F07; font-weight: 600; }
+    .receipt-total {
+        background: #F5EFE8; margin: 1rem -2rem -1.5rem;
+        padding: 1rem 2rem; display: flex;
+        justify-content: space-between; align-items: center;
+    }
+    .receipt-total span { font-size: 0.88rem; color: #7A5540; }
+    .receipt-total strong { font-size: 1.3rem; color: #7B3121; font-family: 'Playfair Display', serif; }
+    .btn-close-modal { width: 100%; margin-top: 1rem; padding: 10px; background: #7B3121; color: white; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.9rem; font-weight: 600; }
+
+    .empty-state    { background: white; border-radius: 14px; padding: 4rem; text-align: center; color: #9A7060; border: 1px solid #EAE0D8; }
+    .empty-state h3 { color: #7B3121; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif; font-size: 1.4rem; }
+    .empty-cta      { margin-top: 1.2rem; background: #7B3121; color: white; border: none; padding: 11px 28px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.9rem; font-weight: 600; }
+
+    .loading-spinner { text-align: center; padding: 4rem; color: #7B3121; }
+
+    .alert { padding: 10px 14px; border-radius: 8px; font-size: 0.84rem; margin-bottom: 1rem; }
+    .alert-ok  { background: #E6F4EA; color: #2E7D32; border: 1px solid #A5D6A7; }
+    .alert-err { background: #FEF2F2; color: #C62828; border: 1px solid #FFCDD2; }
+
+    @@media (max-width: 600px) {
+        .booking-card { flex-direction: column; }
+        .booking-img  { width: 100%; height: 180px; }
+        .booking-body { padding: 1rem; }
+        .toolbar { flex-direction: column; align-items: stretch; }
+        .search-input { width: 100%; }
+    }
+</style>
+
+<div class="bookings-page">
+
+    <div class="page-header">
+        <h1>My Bookings</h1>
+        <p>Track and manage all your travel reservations</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(feedbackMsg))
+    {
+        <div class="alert @(feedbackOk ? "alert-ok" : "alert-err")">@feedbackMsg</div>
+    }
+
+    @if (!isLoading)
+    {
+        <!-- Summary strip -->
+        <div class="summary-strip">
+            <div class="summary-cell">
+                <strong>@allBookings.Count</strong> Total
+            </div>
+            <div class="summary-cell">
+                <strong>@allBookings.Count(b => b.Status == "Confirmed")</strong> Confirmed
+            </div>
+            <div class="summary-cell">
+                <strong>@allBookings.Count(b => b.Status == "Pending")</strong> Pending
+            </div>
+            <div class="summary-cell">
+                💰 SR <strong>@allBookings.Where(b=>b.Status=="Confirmed"||b.Status=="Completed").Sum(b=>b.TotalPrice).ToString("N0")</strong> Total Spend
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="filter-row">
+                @foreach (var f in filters)
+                {
+                    var lbl = f;
+                    <button class="filter-btn @(statusFilter == lbl ? "active" : "")"
+                            @onclick="@(() => statusFilter = lbl)">@lbl</button>
+                }
+            </div>
+            <input class="search-input" placeholder="🔍 Search destination…"
+                   @bind="searchQuery" @bind:event="oninput" />
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner"><p>Loading your bookings…</p></div>
+    }
+    else if (!Filtered.Any())
+    {
+        <div class="empty-state">
+            <p style="font-size:2rem">🏜️</p>
+            <h3>No bookings found</h3>
+            <p>@(statusFilter == "All" ? "You haven't made any bookings yet." : "No " + statusFilter.ToLower() + " bookings.")</p>
+            <button class="empty-cta" @onclick="@(() => Nav.NavigateTo("/destinations"))">Browse Destinations</button>
+        </div>
+    }
+    else
+    {
+        @foreach (var b in Filtered)
+        {
+            var bv = b;
+            <div class="booking-card">
+                <img class="booking-img" src="@(bv.ImageUrl ?? "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400")"
+                     alt="@bv.DestName"
+                     onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400'" />
+                <div class="booking-body">
+                    <div>
+                        <div class="booking-top">
+                            <div>
+                                <div class="booking-title">@bv.DestName</div>
+                                <div class="booking-ref">Booking #@bv.Id.ToString("D6")</div>
+                            </div>
+                            <span class="status-badge st-@bv.Status">@bv.Status</span>
+                        </div>
+                        <div class="booking-meta">
+                            <span class="meta-item">📅 @bv.StartDate.ToString("dd MMM") – @bv.EndDate.ToString("dd MMM yyyy")</span>
+                            <span class="meta-item">🌙 @((bv.EndDate - bv.StartDate).Days) nights</span>
+                            <span class="meta-item">👥 @bv.NumberOfTravelers traveler@(bv.NumberOfTravelers > 1 ? "s" : "")</span>
+                            <span class="meta-item" style="color:#7B3121;font-weight:700;">💰 SR @bv.TotalPrice.ToString("N0")</span>
+                        </div>
+                    </div>
+                    <div class="booking-actions">
+                        <button class="btn-view"
+                                @onclick="@(() => Nav.NavigateTo("/destination/" + bv.DestinationId))">
+                            View Destination
+                        </button>
+                        <button class="btn-receipt"
+                                @onclick="@(() => { receiptBooking = bv; showReceipt = true; })">
+                            📄 Receipt
+                        </button>
+                        @if (bv.Status == "Completed")
+                        {
+                            <button class="btn-view" style="background:#C8873A;"
+                                    @onclick="@(() => Nav.NavigateTo($"/destination/{bv.DestinationId}#reviews"))">
+                                ⭐ Write Review
+                            </button>
+                        }
+                        @if (bv.Status != "Cancelled")
+                        {
+                            <button class="btn-receipt" style="color:#C62828;border-color:#C62828;"
+                                    @onclick="@(() => Nav.NavigateTo($"/complaints?bookingRef={bv.Id}&destination={Uri.EscapeDataString(bv.DestName)}"))">
+                                📣 Report Issue
+                            </button>
+                        }
+                        @if (bv.Status != "Cancelled" && bv.Status != "Completed")
+                        {
+                            <button class="btn-cancel"
+                                    @onclick="@(() => { cancelTarget = bv; showCancelModal = true; })">
+                                Cancel
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+</div>
+
+<!-- ══ Cancel Confirmation Modal ══ -->
+@if (showCancelModal && cancelTarget != null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-box">
+            <h3>Cancel Booking?</h3>
+            <p>
+                Are you sure you want to cancel your booking for
+                <strong>@cancelTarget.DestName</strong>
+                (@cancelTarget.StartDate.ToString("dd MMM") – @cancelTarget.EndDate.ToString("dd MMM yyyy"))?
+                <br/><br/>
+                Cancellations may be subject to our refund policy. This action cannot be undone.
+            </p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" @onclick="@(()=>{ showCancelModal=false; cancelTarget=null; })">
+                    Keep Booking
+                </button>
+                <button class="btn-modal-confirm" @onclick="ConfirmCancelAsync" disabled="@isCancelling">
+                    @(isCancelling ? "Cancelling…" : "Yes, Cancel")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══ Receipt Modal ══ -->
+@if (showReceipt && receiptBooking != null)
+{
+    var rb = receiptBooking;
+    <div class="modal-backdrop" @onclick="@(()=>showReceipt=false)">
+        <div class="receipt-box" @onclick:stopPropagation="true">
+            <div class="receipt-header">
+                <h3>Booking Receipt</h3>
+                <p>Saudi Heritage — Official Confirmation</p>
+            </div>
+            <div class="receipt-body">
+                <div class="receipt-row">
+                    <span class="receipt-label">Booking ID</span>
+                    <span class="receipt-value">#@rb.Id.ToString("D6")</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Destination</span>
+                    <span class="receipt-value">@rb.DestName</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Check-in</span>
+                    <span class="receipt-value">@rb.StartDate.ToString("dd MMMM yyyy")</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Check-out</span>
+                    <span class="receipt-value">@rb.EndDate.ToString("dd MMMM yyyy")</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Duration</span>
+                    <span class="receipt-value">@((rb.EndDate - rb.StartDate).Days) nights</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Travelers</span>
+                    <span class="receipt-value">@rb.NumberOfTravelers</span>
+                </div>
+                <div class="receipt-row">
+                    <span class="receipt-label">Status</span>
+                    <span class="receipt-value">@rb.Status</span>
+                </div>
+                <div class="receipt-total">
+                    <span>Total Amount</span>
+                    <strong>SR @rb.TotalPrice.ToString("N0")</strong>
+                </div>
+            </div>
+            <div style="padding:0 2rem 1.5rem;">
+                <button class="btn-close-modal" @onclick="@(()=>showReceipt=false)">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly string[] filters = { "All", "Confirmed", "Pending", "Completed", "Cancelled" };
+    private bool      isLoading    = true;
+    private string    statusFilter = "All";
+    private string    searchQuery  = "";
+    private List<BVM> allBookings  = new();
+    private string    feedbackMsg  = "";
+    private bool      feedbackOk   = true;
+
+    // Cancel flow
+    private BVM?  cancelTarget    = null;
+    private bool  showCancelModal = false;
+    private bool  isCancelling    = false;
+
+    // Receipt flow
+    private BVM?  receiptBooking  = null;
+    private bool  showReceipt     = false;
+
+    private IEnumerable<BVM> Filtered
+    {
+        get
+        {
+            var q = allBookings.AsEnumerable();
+            if (statusFilter != "All")
+                q = q.Where(b => b.Status == statusFilter);
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+                q = q.Where(b => b.DestName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+            return q;
+        }
+    }
+
+    private class BVM
+    {
+        public int      Id                { get; set; }
+        public int      DestinationId     { get; set; }
+        public string   DestName          { get; set; } = "";
+        public string?  ImageUrl          { get; set; }
+        public DateTime StartDate         { get; set; }
+        public DateTime EndDate           { get; set; }
+        public string   Status            { get; set; } = "Pending";
+        public int      NumberOfTravelers { get; set; }
+        public decimal  TotalPrice        { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth   = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+        try
+        {
+            var bookings = (await BookingService.GetUserBookingsAsync(userId)).ToList();
+            if (!bookings.Any()) { isLoading = false; return; }
+
+            var destIds    = bookings.Select(b => b.DestinationId).Distinct().ToList();
+            var destLookup = (await DestinationService.GetByIdsAsync(destIds)).ToDictionary(d => d.Id);
+
+            allBookings = bookings.Select(b =>
+            {
+                destLookup.TryGetValue(b.DestinationId, out var dest);
+                return new BVM
+                {
+                    Id                = b.Id,
+                    DestinationId     = b.DestinationId,
+                    DestName          = dest?.Name     ?? "Unknown Destination",
+                    ImageUrl          = dest?.ImageUrl,
+                    StartDate         = b.StartDate,
+                    EndDate           = b.EndDate,
+                    Status            = b.Status       ?? "Pending",
+                    NumberOfTravelers = b.NumberOfTravelers,
+                    TotalPrice        = b.TotalPrice,
+                };
+            }).OrderByDescending(b => b.StartDate).ToList();
+        }
+        catch (Exception ex)
+        {
+            feedbackMsg = "Could not load bookings. Please refresh.";
+            feedbackOk  = false;
+            Console.Error.WriteLine("[MyBookings] " + ex.Message);
+        }
+        finally { isLoading = false; }
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (cancelTarget == null) return;
+        isCancelling = true;
+        try
+        {
+            var auth   = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+            await BookingService.CancelAsync(cancelTarget.Id, userId);
+            cancelTarget.Status = "Cancelled";
+            feedbackMsg = $"Booking for {cancelTarget.DestName} has been cancelled.";
+            feedbackOk  = true;
+        }
+        catch (Exception ex)
+        {
+            feedbackMsg = "Failed to cancel. Please try again.";
+            feedbackOk  = false;
+            Console.Error.WriteLine("[MyBookings] Cancel: " + ex.Message);
+        }
+        finally
+        {
+            isCancelling   = false;
+            showCancelModal = false;
+            cancelTarget   = null;
+        }
+    }
+}

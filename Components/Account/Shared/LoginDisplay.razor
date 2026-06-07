@@ -1,0 +1,22 @@
+@* LoginDisplay.razor
+   Place at: DunesOfArabia/Components/Account/Shared/LoginDisplay.razor
+
+   Shows in the top-right of MainLayout.
+   - When logged in: shows username + Logout button
+   - When logged out: shows Register + Login links *@
+
+@using Microsoft.AspNetCore.Components.Authorization
+
+<AuthorizeView>
+    <Authorized>
+        <span class="text-dark me-2">Hello, @context.User.Identity?.Name!</span>
+        <form action="Account/Logout" method="post" style="display:inline">
+            <AntiforgeryToken />
+            <button type="submit" class="btn btn-link p-0 text-dark">Logout</button>
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <a href="Account/Register" class="me-3">Register</a>
+        <a href="Account/Login">Login</a>
+    </NotAuthorized>
+</AuthorizeView>

@@ -1,0 +1,45 @@
+@* ExternalLoginPicker.razor
+   Place at: DunesOfArabia/Components/Account/Shared/ExternalLoginPicker.razor
+
+   Shows buttons for any external OAuth providers (Google, Facebook, etc.)
+   configured in Program.cs. If none are configured it shows a friendly message.
+   Used on Login.razor and Register.razor. *@
+
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<DunesOfArabia.Models.ApplicationUser> SignInManager
+
+@if (externalLogins.Count == 0)
+{
+    <div>
+        <p>There are no external authentication services configured.</p>
+    </div>
+}
+else
+{
+    <form action="Account/ExternalLogin" method="post">
+        <AntiforgeryToken />
+        <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+        <div>
+            @foreach (var provider in externalLogins)
+            {
+                <button type="submit" name="provider" value="@provider.Name"
+                        class="btn btn-primary mb-2 w-100"
+                        title="Log in using your @provider.DisplayName account">
+                    @provider.DisplayName
+                </button>
+            }
+        </div>
+    </form>
+}
+
+@code {
+    private IList<AuthenticationScheme> externalLogins = new List<AuthenticationScheme>();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        externalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+    }
+}

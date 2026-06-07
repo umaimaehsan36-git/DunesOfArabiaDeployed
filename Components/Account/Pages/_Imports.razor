@@ -1,0 +1,15 @@
+@* _Imports.razor
+   Place this file at:
+   DunesOfArabia/Components/Account/_Imports.razor
+
+   The Account folder needs its own _Imports.razor so that
+   components inside it (Login, Register, etc.) can see the Shared
+   sub-namespace without repeating @using on every single page.
+   This is what provides StatusMessage, ExternalLoginPicker,
+   RedirectToLogin, and LoginDisplay to all Account pages. *@
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using DunesOfArabia.Data
+@using DunesOfArabia.Components.Account.Shared

@@ -1,0 +1,125 @@
+@page "/Account/RegisterConfirmation"
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using Microsoft.AspNetCore.Identity
+@using DunesOfArabia.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Check Your Email – Dunes Of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    .auth-page {
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 60% 40%, #E8D9C5 0%, #DFD0B8 50%, #D4C4A8 100%);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 2.5rem 1.5rem; font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+    .auth-brand { text-align: center; margin-bottom: 2rem; }
+    .auth-brand h1 {
+        font-family: 'Playfair Display', Georgia, serif; font-size: 2.6rem; font-weight: 700;
+        color: #7B2D10; letter-spacing: 3px; text-transform: uppercase; margin-bottom: .4rem;
+    }
+    .auth-brand p { font-size: 1rem; color: #8B6650; }
+
+    .auth-card {
+        background: #FFFFFF; border-radius: 16px; padding: 3rem 3rem 2.5rem;
+        width: 100%; max-width: 520px; box-shadow: 0 4px 40px rgba(100,50,20,.10);
+        text-align: center;
+    }
+
+    .icon-wrap {
+        width: 72px; height: 72px; border-radius: 50%;
+        background: #FEF3EC; display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 1.5rem; font-size: 2rem;
+    }
+
+    .card-title {
+        font-family: 'Playfair Display', Georgia, serif; font-size: 1.9rem;
+        font-weight: 600; color: #1C0F07; margin-bottom: 1rem;
+    }
+
+    .card-body {
+        font-size: .95rem; color: #5A3E30; line-height: 1.7; margin-bottom: 1.75rem;
+    }
+    .card-body strong { color: #1C0F07; }
+
+    .info-box {
+        background: #FDFAF7; border: 1.5px solid #E5D8C8; border-radius: 10px;
+        padding: 1rem 1.25rem; margin-bottom: 1.75rem; font-size: .875rem;
+        color: #7B5C48; line-height: 1.6; text-align: left;
+    }
+    .info-box span { display: block; margin-bottom: .3rem; }
+    .info-box span:last-child { margin-bottom: 0; }
+
+    .btn-login {
+        display: inline-block; width: 100%; padding: 14px;
+        background-color: #7B2D10; color: white; border: none; border-radius: 8px;
+        font-size: 1rem; font-weight: 600; font-family: inherit; cursor: pointer;
+        letter-spacing: .5px; text-decoration: none;
+        transition: background-color .25s, transform .2s, box-shadow .25s;
+        margin-bottom: .5rem;
+    }
+    .btn-login:hover { background-color: #5C2009; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,45,16,.35); }
+
+    .card-footer-text {
+        text-align: center; font-size: .875rem; color: #8B6650;
+        padding-top: 1.25rem; border-top: 1px solid #F0E6D8; margin-top: 1.25rem;
+    }
+    .card-footer-text a { color: #1C0F07; font-weight: 700; text-decoration: none; }
+    .card-footer-text a:hover { color: #7B2D10; text-decoration: underline; }
+
+    @@media (max-width: 600px) {
+        .auth-card { padding: 2.5rem 1.75rem 2rem; }
+        .auth-brand h1 { font-size: 2rem; letter-spacing: 2px; }
+    }
+</style>
+
+<div class="auth-page">
+    <div class="auth-brand">
+        <h1>Saudi Heritage</h1>
+        <p>Begin your journey with us</p>
+    </div>
+
+    <div class="auth-card">
+        <div class="icon-wrap">📧</div>
+
+        <h2 class="card-title">Check Your Email</h2>
+
+        <p class="card-body">
+            Your account has been created successfully.<br />
+            @if (!string.IsNullOrEmpty(Email))
+            {
+                <span>We sent a confirmation link to <strong>@Email</strong>.</span>
+            }
+            else
+            {
+                <span>A confirmation link has been sent to your email address.</span>
+            }
+        </p>
+
+        <div class="info-box">
+            <span>📬 Open your inbox and click the confirmation link to activate your account.</span>
+            <span>🕐 The link expires in 24 hours.</span>
+            <span>📁 If you don't see it, check your spam or junk folder.</span>
+        </div>
+
+        <a href="/Account/Login" class="btn-login">Go to Login</a>
+
+        <div class="card-footer-text">
+            Wrong email? <a href="/Account/Register">Register again</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+}

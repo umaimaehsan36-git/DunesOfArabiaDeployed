@@ -1,0 +1,124 @@
+﻿@inherits LayoutComponentBase
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .account-navbar {
+        background-color: white;
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .account-navbar-brand {
+        font-family: Georgia, serif;
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #8B5A3C;
+        text-decoration: none;
+        letter-spacing: 1px;
+    }
+
+    .account-nav-links {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+    }
+
+        .account-nav-links a {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+            .account-nav-links a:hover {
+                color: #8B5A3C;
+            }
+
+    .account-auth-buttons {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+        .account-auth-buttons a {
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+    .login-btn {
+        color: #8B5A3C;
+    }
+
+    .signup-btn {
+        background-color: #8B5A3C;
+        color: white !important;
+    }
+
+        .signup-btn:hover {
+            background-color: #5C3D2E !important;
+        }
+
+    .logout-btn {
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-weight: 600;
+        color: #8B5A3C;
+        padding: 8px 16px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+
+        .logout-btn:hover {
+            color: #5C3D2E;
+        }
+
+    .user-name {
+        color: #8B5A3C;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+</style>
+<nav class="account-navbar">
+    <a href="/" class="account-navbar-brand">SAUDI HERITAGE</a>
+    <ul class="account-nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/destinations">Destinations</a></li>
+        <li><a href="/map">Map</a></li>
+        <li><a href="/activities">Activities</a></li>
+        <li><a href="/planner">Planner</a></li>
+    </ul>
+    <div class="account-auth-buttons">
+        <AuthorizeView>
+            <Authorized>
+                <span class="user-name">@context.User.Identity?.Name</span>
+                <form action="/Account/Logout" method="post" style="display:inline;">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <button type="submit" class="logout-btn">Logout</button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/Account/Login" class="login-btn">Login</a>
+                <a href="/Account/Register" class="signup-btn">Get Started</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</nav>
+@Body
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

@@ -1,0 +1,17 @@
+@* RedirectToLogin.razor
+   Place at: DunesOfArabia/Components/Account/Shared/RedirectToLogin.razor
+
+   Used in Routes.razor inside <NotAuthorized>.
+   Automatically redirects unauthenticated users to the Login page,
+   preserving the original URL as a returnUrl query parameter. *@
+
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        var returnUrl = Uri.EscapeDataString(
+            NavigationManager.ToBaseRelativePath(NavigationManager.Uri));
+        NavigationManager.NavigateTo($"Account/Login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}

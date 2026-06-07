@@ -1,0 +1,497 @@
+@* Shared/SideNav.razor *@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600&display=swap');
+
+    .sidenav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 210px;
+        background: #FAF6F1;
+        border-right: 1px solid #E8DDD3;
+        display: flex;
+        flex-direction: column;
+        z-index: 1000;
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+    }
+
+    /* Logo area */
+    .sidenav-logo {
+        padding: 1.6rem 1.4rem 1.2rem;
+        border-bottom: 1px solid #EAE0D8;
+        text-decoration: none;
+        display: block;
+    }
+
+    .sidenav-logo h2 {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 0.92rem;
+        color: #7B3121;
+        font-weight: 700;
+        letter-spacing: 2.5px;
+        line-height: 1.3;
+        text-transform: uppercase;
+    }
+
+    .sidenav-logo span {
+        font-size: 0.65rem;
+        color: #B09A8A;
+        letter-spacing: 1px;
+        display: block;
+        margin-top: 2px;
+        font-family: 'Lato', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+    }
+
+    /* Nav sections */
+    .nav-section {
+        padding: 1.1rem 0 0.4rem;
+    }
+
+    .nav-section-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 1.4px;
+        color: #C0AFA5;
+        padding: 0 1.4rem;
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        font-family: 'Lato', sans-serif;
+    }
+
+    /* Nav links */
+    .nav-link-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 1.4rem;
+        color: #4A3828;
+        text-decoration: none;
+        font-size: 0.88rem;
+        font-family: 'Lato', sans-serif;
+        font-weight: 500;
+        border-left: 3px solid transparent;
+        transition: color 0.18s, background 0.18s, border-color 0.18s;
+        cursor: pointer;
+        background: none;
+        border-top: none;
+        border-right: none;
+        border-bottom: none;
+        width: 100%;
+        text-align: left;
+    }
+
+    .nav-link-item:hover {
+        color: #7B3121;
+        background: rgba(123,49,33,0.06);
+        border-left-color: rgba(123,49,33,0.3);
+    }
+
+    .nav-link-item.active {
+        color: white;
+        background: #7B3121;
+        border-left-color: #7B3121;
+        border-radius: 0 6px 6px 0;
+        margin-right: 0.8rem;
+    }
+
+    .nav-link-item.active:hover {
+        background: #6A2819;
+    }
+
+    .nav-link-item svg {
+        flex-shrink: 0;
+        opacity: 0.75;
+    }
+
+    .nav-link-item.active svg {
+        opacity: 1;
+        stroke: white;
+    }
+
+    .nav-link-item:not(.active) svg {
+        stroke: #7A6658;
+    }
+
+    /* Divider */
+    .nav-divider {
+        height: 1px;
+        background: #EAE0D8;
+        margin: 0.5rem 1.4rem;
+    }
+
+    /* User footer */
+    .sidenav-footer {
+        margin-top: auto;
+        padding: 1rem 1.4rem 1.4rem;
+        border-top: 1px solid #EAE0D8;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 0.75rem;
+    }
+
+    .user-avatar {
+        width: 34px;
+        height: 34px;
+        background: #7B3121;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        color: white;
+        font-weight: 700;
+        flex-shrink: 0;
+        font-family: 'Lato', sans-serif;
+    }
+
+    .user-name {
+        font-size: 0.83rem;
+        color: #2E1A0E;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: 'Lato', sans-serif;
+    }
+
+    .user-email {
+        font-size: 0.70rem;
+        color: #9A8878;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: 'Lato', sans-serif;
+    }
+
+    .btn-collapse {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        border: none;
+        color: #9A8878;
+        font-size: 0.78rem;
+        font-family: 'Lato', sans-serif;
+        cursor: pointer;
+        padding: 4px 0;
+        transition: color 0.18s;
+    }
+
+    .btn-collapse:hover { color: #7B3121; }
+
+    .btn-logout {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        background: rgba(123,49,33,0.06);
+        color: #7B3121;
+        border: 1px solid #D4C0B4;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-family: 'Lato', sans-serif;
+        cursor: pointer;
+        transition: background 0.18s, color 0.18s;
+        text-decoration: none;
+        margin-top: 0.5rem;
+    }
+
+    .btn-logout:hover { background: #7B3121; color: white; border-color: #7B3121; }
+
+    .btn-login {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 9px;
+        background: #7B3121;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        font-family: 'Lato', sans-serif;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.18s;
+    }
+
+    .btn-login:hover { background: #5C2218; color: white; }
+
+    /* Mobile */
+    .sidenav-toggle {
+        display: none;
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        z-index: 1100;
+        width: 40px;
+        height: 40px;
+        background: #FAF6F1;
+        border: 1px solid #E8DDD3;
+        border-radius: 8px;
+        color: #4A3828;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .sidenav-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 999;
+    }
+
+    @@media (max-width: 768px) {
+        .sidenav { transform: translateX(-100%); }
+        .sidenav.open { transform: translateX(0); }
+        .sidenav-toggle { display: flex; }
+        .sidenav-overlay.open { display: block; }
+    }
+</style>
+
+<!-- Mobile toggle -->
+<button class="sidenav-toggle" @onclick="ToggleNav" aria-label="Open menu">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+</button>
+
+<!-- Overlay (mobile) -->
+<div class="sidenav-overlay @(isOpen ? "open" : "")" @onclick="ToggleNav"></div>
+
+<!-- Sidebar -->
+<nav class="sidenav @(isOpen ? "open" : "")">
+
+    <!-- Logo -->
+    <a href="/" class="sidenav-logo">
+        <h2>SAUDI HERITAGE</h2>
+        <span>DUNES OF ARABIA</span>
+    </a>
+
+    <!-- Main Navigation -->
+    <div class="nav-section">
+
+        <a href="/" class="nav-link-item @(IsActive("/") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            Home
+        </a>
+
+        <a href="/destinations" class="nav-link-item @(IsActive("/destinations") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+            </svg>
+            Destinations
+        </a>
+
+        <a href="/planner" class="nav-link-item @(IsActive("/planner") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Planner
+        </a>
+
+        <a href="/activities" class="nav-link-item @(IsActive("/activities") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Activities
+        </a>
+
+        <a href="/favorites" class="nav-link-item @(IsActive("/favorites") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+            Saved Trips
+        </a>
+
+        <a href="/profile" class="nav-link-item @(IsActive("/profile") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Profile
+        </a>
+
+        <a href="/settings" class="nav-link-item @(IsActive("/settings") ? "active" : "")">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Settings
+        </a>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <!-- Account Section (only when logged in) -->
+    <AuthorizeView>
+        <Authorized Context="authUser">
+            <div class="nav-section">
+                <p class="nav-section-label">My Account</p>
+
+                <a href="/bookings" class="nav-link-item @(IsActive("/bookings") ? "active" : "")">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    My Bookings
+                </a>
+
+                <a href="/itinerary" class="nav-link-item @(IsActive("/itinerary") ? "active" : "")">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6"/>
+                        <line x1="8" y1="12" x2="21" y2="12"/>
+                        <line x1="8" y1="18" x2="21" y2="18"/>
+                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                    </svg>
+                    My Itineraries
+                </a>
+
+                <a href="/complaints" class="nav-link-item @(IsActive("/complaints") ? "active" : "")">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    Complaints
+                </a>
+            </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- Admin section -->
+            <AuthorizeView Roles="Admin">
+                <Authorized Context="adminUser">
+                    <div class="nav-section">
+                        <p class="nav-section-label">Admin</p>
+
+                        <a href="/admin/destinations" class="nav-link-item @(IsActive("/admin/destinations") ? "active" : "")">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                            </svg>
+                            Manage Destinations
+                        </a>
+
+                        <a href="/admin/bookings" class="nav-link-item @(IsActive("/admin/bookings") ? "active" : "")">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 11 12 14 22 4"/>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                            </svg>
+                            Manage Bookings
+                        </a>
+
+                        <a href="/admin/complaints" class="nav-link-item @(IsActive("/admin/complaints") ? "active" : "")">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            Manage Complaints
+                        </a>
+                    </div>
+                    <div class="nav-divider"></div>
+                </Authorized>
+            </AuthorizeView>
+        </Authorized>
+    </AuthorizeView>
+
+    <!-- Footer: user info + login/logout -->
+    <div class="sidenav-footer">
+        <AuthorizeView>
+            <Authorized Context="footerUser">
+                <div class="user-info">
+                    <div class="user-avatar">@GetInitials(footerUser.User.Identity?.Name)</div>
+                    <div style="min-width:0">
+                        <div class="user-name">@footerUser.User.Identity?.Name</div>
+                        <div class="user-email">@GetEmail(footerUser)</div>
+                    </div>
+                </div>
+                <button class="btn-collapse" @onclick="ToggleNav">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    Collapse
+                </button>
+                <form action="/Account/Logout" method="post" style="width:100%;margin-top:0.5rem;">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <button type="submit" class="btn-logout">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        Sign Out
+                    </button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/Account/Login" class="btn-login">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    Sign In
+                </a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</nav>
+
+@code {
+    private bool isOpen = false;
+
+    private void ToggleNav() => isOpen = !isOpen;
+
+    private bool IsActive(string href)
+    {
+        var current = Nav.ToBaseRelativePath(Nav.Uri).ToLower();
+        var target  = href.TrimStart('/').ToLower();
+        if (href == "/") return current == "" || current == "/";
+        return current.StartsWith(target);
+    }
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return name[0].ToString().ToUpper();
+    }
+
+    private string GetEmail(AuthenticationState state)
+    {
+        // Try to get email claim
+        var email = state.User.FindFirst(c => c.Type.Contains("email"))?.Value;
+        return email ?? "";
+    }
+}

@@ -1,0 +1,17 @@
+@page "/Account/InvalidUser"
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+<PageTitle>Invalid user</PageTitle>
+
+<h3>Invalid user</h3>
+
+{{!-- FIX #14: Original
+<StatusMessage /> had no Message parameter and no way
+     to receive one, so it always displayed nothing. Now it reads a message
+     from the query string (standard pattern used across other Account pages). --}}
+<StatusMessage Message="@StatusMessage" />
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? StatusMessage { get; set; }
+}

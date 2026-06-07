@@ -1,0 +1,712 @@
+@page "/profile"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+@using DunesOfArabia.Data
+
+@attribute [Authorize]
+
+@inject IDestinationService DestinationService
+@inject IReviewService ReviewService
+@inject IBookingService BookingService
+@inject IItineraryService ItineraryService
+@inject IUserFavoriteService UserFavoriteService
+@inject UserManager<ApplicationUser> UserManager
+@inject IDocumentUploadService DocumentUploadService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Profile – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+
+    .profile-page { padding: 2rem; background: #F5EFE8; min-height: 100vh; font-family: 'Lato', sans-serif; }
+    .profile-banner { background: white; border-radius: 14px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .banner-top { height: 120px; background: linear-gradient(135deg, #7B3121, #C8873A); }
+    .banner-bottom { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .banner-left { display: flex; gap: 1rem; align-items: center; }
+    .avatar-circle { width: 80px; height: 80px; border-radius: 50%; background: #7B3121; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: bold; flex-shrink: 0; border: 4px solid white; margin-top: -2.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
+    .btn-edit { background: #7B3121; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 600; }
+
+    /* ── Profile Completeness Banner ── */
+    .profile-gate {
+        background: white;
+        border-radius: 14px;
+        padding: 1.5rem 1.8rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        border-left: 5px solid #C8873A;
+    }
+    .profile-gate.complete { border-left-color: #2E7D32; }
+    .gate-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .gate-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: #1C1008; font-weight: 700; }
+    .gate-subtitle { font-size: 0.82rem; color: #7A6658; margin-top: 2px; }
+    .gate-progress-bar { height: 8px; background: #EAE0D8; border-radius: 99px; overflow: hidden; margin-bottom: 1rem; }
+    .gate-progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #C8873A, #7B3121); transition: width 0.4s ease; }
+    .gate-progress-fill.complete { background: linear-gradient(90deg, #4CAF50, #2E7D32); }
+    .gate-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.6rem; }
+    .gate-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; padding: 0.5rem 0.75rem; border-radius: 7px; background: #F5EFE8; }
+    .gate-item.done { background: #E8F5E9; }
+    .gate-item.done .gate-dot { background: #2E7D32; color: white; }
+    .gate-dot { width: 22px; height: 22px; border-radius: 50%; background: #E0D5CA; color: #9A8878; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
+    .gate-item-label { color: #3A2A1E; font-weight: 500; }
+    .gate-item.done .gate-item-label { color: #2E7D32; }
+    .gate-cta { margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .btn-complete-profile { background: #7B3121; color: white; border: none; padding: 9px 20px; border-radius: 7px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.86rem; }
+    .btn-go-book { background: #2E7D32; color: white; border: none; padding: 9px 20px; border-radius: 7px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.86rem; }
+    .gate-note { font-size: 0.79rem; color: #7A6658; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-cell { background: white; border-radius: 12px; padding: 1.5rem; text-align: center; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+    .stat-num { font-size: 2rem; color: #7B3121; font-weight: bold; font-family: 'Playfair Display', serif; }
+    .stat-label { font-size: 0.8rem; color: #9A8878; margin-top: 4px; }
+
+    .tab-strip { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .tab-btn { border: 1.5px solid #C4A090; background: white; color: #7B3121; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 500; transition: all 0.18s; }
+    .tab-btn:hover { border-color: #7B3121; }
+    .tab-active { background: #7B3121; color: white; border-color: #7B3121; }
+
+    .places-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+    .place-card { position: relative; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.22s; }
+    .place-card:hover { transform: translateY(-3px); }
+    .place-card img { width: 100%; height: 220px; object-fit: cover; display: block; }
+    .place-overlay { position: absolute; bottom: 0; width: 100%; padding: 1rem; background: linear-gradient(to top, rgba(0,0,0,.7), transparent); color: white; }
+
+    .review-card, .packing-card, .upload-card { background: white; border-radius: 12px; padding: 1.4rem; margin-bottom: 1rem; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+
+    /* ── Documents ── */
+    .upload-drop-zone { border: 2px dashed #C4A090; padding: 2rem; border-radius: 12px; text-align: center; background: #FDFAF7; transition: border-color 0.2s, background 0.2s; }
+    .upload-drop-zone:hover { border-color: #7B3121; background: #FAF5EF; }
+
+    /* Required documents checklist */
+    .req-docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .req-doc-card { background: #F5EFE8; border-radius: 10px; padding: 1rem; border: 1.5px solid #E0D5CA; display: flex; align-items: center; gap: 0.75rem; }
+    .req-doc-card.uploaded { background: #E8F5E9; border-color: #A5D6A7; }
+    .req-doc-icon { width: 38px; height: 38px; border-radius: 8px; background: #EAD9C8; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .req-doc-card.uploaded .req-doc-icon { background: #C8E6C9; }
+    .req-doc-info strong { display: block; font-size: 0.86rem; color: #1C1008; font-weight: 600; }
+    .req-doc-info small { font-size: 0.76rem; color: #7A6658; }
+    .req-doc-status { margin-left: auto; font-size: 0.75rem; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    .req-doc-status.ok { background: #C8E6C9; color: #2E7D32; }
+    .req-doc-status.missing { background: #FFECB3; color: #F57F17; }
+
+    .doc-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #F0E8DC; }
+    .doc-info { display: flex; flex-direction: column; }
+    .doc-info strong { font-size: 0.9rem; color: #2C1A12; }
+    .doc-info small  { color: #888; font-size: 0.78rem; }
+    .doc-actions { display: flex; gap: 0.5rem; }
+    .btn-doc-view   { background: #F5EFE8; border: 1px solid #C8A882; color: #7B3121; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; text-decoration: none; }
+    .btn-doc-delete { background: white; border: 1px solid #c62828; color: #c62828; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+    .btn-doc-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+    .upload-msg { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.88rem; margin-top: 0.75rem; }
+    .upload-ok  { background: #e6f4ea; color: #2e7d32; }
+    .upload-err { background: #fce4ec; color: #c62828; }
+    .upload-progress { background: #e3f2fd; color: #1565c0; }
+
+    .empty-state { background: white; padding: 3rem; border-radius: 12px; text-align: center; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+    .empty-cta { margin-top: 1rem; background: #7B3121; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 600; }
+
+    @@media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2,1fr); } .places-grid { grid-template-columns: 1fr; } .gate-items { grid-template-columns: 1fr; } }
+</style>
+
+<div class="profile-page">
+
+    <div class="profile-banner">
+        <div class="banner-top"></div>
+        <div class="banner-bottom">
+            <div class="banner-left">
+                <div class="avatar-circle">@userInitials</div>
+                <div>
+                    <h2 style="margin:0 0 .25rem; font-family:'Playfair Display',serif;">@userName</h2>
+                    <p style="margin:0;color:#888">@userEmail</p>
+                    <p style="margin:0;color:#888;font-size:.85rem">Member since @memberSince</p>
+                </div>
+            </div>
+            <button class="btn-edit" @onclick='() => Nav.NavigateTo("/settings")'>Edit Profile</button>
+        </div>
+    </div>
+
+    <!-- ══ PROFILE COMPLETENESS GATE ══
+         This is the booking gate — user must complete their profile before booking.
+         Required: name, phone, nationality, passport scan, valid ID, selfie.
+    -->
+    <div class="profile-gate @(isProfileComplete ? "complete" : "")">
+        <div class="gate-header">
+            <div>
+                <div class="gate-title">
+                    @if (isProfileComplete)
+                    { <span>✅ Profile Complete — You can book!</span> }
+                    else
+                    { <span>⚠️ Complete Your Profile to Book Trips</span> }
+                </div>
+                <div class="gate-subtitle">
+                    @profileCompletionPct% complete — @completedSteps of @totalSteps requirements met
+                </div>
+            </div>
+        </div>
+
+        <div class="gate-progress-bar">
+            <div class="gate-progress-fill @(isProfileComplete ? "complete" : "")"
+                 style="width: @profileCompletionPct%"></div>
+        </div>
+
+        <div class="gate-items">
+            <div class="gate-item @(hasName ? "done" : "")">
+                <div class="gate-dot">@(hasName ? "✓" : "1")</div>
+                <div class="gate-item-label">Full Name</div>
+            </div>
+            <div class="gate-item @(hasPhone ? "done" : "")">
+                <div class="gate-dot">@(hasPhone ? "✓" : "2")</div>
+                <div class="gate-item-label">Phone Number</div>
+            </div>
+            <div class="gate-item @(hasNationality ? "done" : "")">
+                <div class="gate-dot">@(hasNationality ? "✓" : "3")</div>
+                <div class="gate-item-label">Nationality</div>
+            </div>
+            <div class="gate-item @(hasPassport ? "done" : "")">
+                <div class="gate-dot">@(hasPassport ? "✓" : "4")</div>
+                <div class="gate-item-label">Passport / Travel Document</div>
+            </div>
+            <div class="gate-item @(hasNationalId ? "done" : "")">
+                <div class="gate-dot">@(hasNationalId ? "✓" : "5")</div>
+                <div class="gate-item-label">National ID / Iqama</div>
+            </div>
+            <div class="gate-item @(hasSelfie ? "done" : "")">
+                <div class="gate-dot">@(hasSelfie ? "✓" : "6")</div>
+                <div class="gate-item-label">Selfie / Profile Photo</div>
+            </div>
+        </div>
+
+        <div class="gate-cta">
+            @if (isProfileComplete)
+            {
+                <button class="btn-go-book" @onclick='() => Nav.NavigateTo("/destinations")'>
+                    🗺️ Browse &amp; Book Trips
+                </button>
+                <span class="gate-note">Your profile is verified. Happy travels!</span>
+            }
+            else
+            {
+                <button class="btn-complete-profile" @onclick='() => activeTab = "documents"'>
+                    📎 Upload Missing Documents
+                </button>
+                <button class="btn-complete-profile" style="background:#C8873A;"
+                        @onclick='() => Nav.NavigateTo("/settings")'>
+                    ✏️ Complete Profile Info
+                </button>
+                <span class="gate-note">Complete all steps to unlock trip booking.</span>
+            }
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-cell"><div class="stat-num">@stats.PlacesVisited</div><div class="stat-label">Places Saved</div></div>
+        <div class="stat-cell"><div class="stat-num">@stats.BookingsCompleted</div><div class="stat-label">Trips Completed</div></div>
+        <div class="stat-cell"><div class="stat-num">@stats.ReviewsWritten</div><div class="stat-label">Reviews Written</div></div>
+        <div class="stat-cell"><div class="stat-num">@stats.FavoritesCount</div><div class="stat-label">Favorites</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-strip">
+        <button class="tab-btn @(activeTab == "places"    ? "tab-active" : "")" @onclick='() => activeTab = "places"'>🗺️ Places</button>
+        <button class="tab-btn @(activeTab == "reviews"   ? "tab-active" : "")" @onclick='() => activeTab = "reviews"'>⭐ Reviews</button>
+        <button class="tab-btn @(activeTab == "packing"   ? "tab-active" : "")" @onclick='() => activeTab = "packing"'>🎒 Packing</button>
+        <button class="tab-btn @(activeTab == "documents" ? "tab-active" : "")" @onclick='() => activeTab = "documents"'>
+            📎 Documents
+            @if (!isProfileComplete)
+            {
+                <span style="display:inline-block;background:#C8873A;color:white;border-radius:99px;font-size:0.65rem;padding:1px 7px;margin-left:4px;font-weight:700;">!</span>
+            }
+        </button>
+    </div>
+
+    <!-- ══ PLACES TAB ══ -->
+    @if (activeTab == "places")
+    {
+        @if (!visitedPlaces.Any())
+        {
+            <div class="empty-state">
+                <p style="font-size:2rem">🏜️</p>
+                <h3 style="font-family:'Playfair Display',serif;color:#7B3121;">No saved places yet</h3>
+                <p style="color:#7A6658;">Explore destinations and save your favourites!</p>
+                <button class="empty-cta" @onclick='() => Nav.NavigateTo("/destinations")'>Browse Destinations</button>
+            </div>
+        }
+        else
+        {
+            <div class="places-grid">
+                @foreach (var p in visitedPlaces)
+                {
+                    var place = p;
+                    <div class="place-card" @onclick='() => Nav.NavigateTo("/destination/" + place.DestId)'>
+                        <img src="@place.ImageUrl" alt="@place.Name" onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400'" />
+                        <div class="place-overlay">
+                            <h4 style="margin:0 0 .2rem;font-family:'Playfair Display',serif;">@place.Name</h4>
+                            <p style="margin:0;font-size:.8rem">@place.Province</p>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- ══ REVIEWS TAB ══ -->
+    @if (activeTab == "reviews")
+    {
+        @if (!userReviews.Any())
+        {
+            <div class="empty-state"><p>No reviews written yet. After a trip, share your experience!</p></div>
+        }
+        else
+        {
+            @foreach (var rev in userReviews)
+            {
+                <div class="review-card">
+                    <h4 style="margin:0 0 .25rem;color:#7B3121;font-family:'Playfair Display',serif;">@rev.DestName</h4>
+                    <p style="margin:0 0 .5rem;color:#C8873A;font-size:1rem;">@StarString(rev.Stars)</p>
+                    <p style="margin:0;color:#555;line-height:1.6;">@rev.Comment</p>
+                </div>
+            }
+        }
+    }
+
+    <!-- ══ PACKING TAB ══ -->
+    @if (activeTab == "packing")
+    {
+        @if (!packingLists.Any())
+        {
+            <div class="empty-state">
+                <p>No packing lists yet. Create an itinerary in the Trip Planner to generate one!</p>
+                <button class="empty-cta" @onclick='() => Nav.NavigateTo("/planner")'>Go to Planner</button>
+            </div>
+        }
+        else
+        {
+            @foreach (var list in packingLists)
+            {
+                <div class="packing-card">
+                    <h4 style="margin:0 0 .75rem;color:#7B3121;font-family:'Playfair Display',serif;">@list.TripName</h4>
+                    @foreach (var item in list.Items)
+                    {
+                        var pi = item;
+                        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid #F0E8DC">
+                            <input type="checkbox" checked="@pi.IsCompleted" @onchange="() => TogglePackingItemAsync(list, pi)" />
+                            <span style="@(pi.IsCompleted ? "text-decoration:line-through;color:#aaa" : "color:#3A2A1E")">@pi.Name</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+
+    <!-- ══ DOCUMENTS TAB ══ -->
+    @if (activeTab == "documents")
+    {
+        <div class="upload-card">
+            <h3 style="margin:0 0 0.5rem;color:#7B3121;font-family:'Playfair Display',serif;">Required Travel Documents</h3>
+            <p style="color:#7A6658;font-size:0.85rem;margin-bottom:1.2rem;">
+                All documents below are required to enable trip booking. Upload clear scans or photos (PDF, JPG, PNG — max 10 MB each).
+            </p>
+
+            <!-- Required documents status grid -->
+            <div class="req-docs-grid">
+                <div class="req-doc-card @(hasPassport ? "uploaded" : "")">
+                    <div class="req-doc-icon">🛂</div>
+                    <div class="req-doc-info">
+                        <strong>Passport / Travel Document</strong>
+                        <small>Valid for 6+ months</small>
+                    </div>
+                    <span class="req-doc-status @(hasPassport ? "ok" : "missing")">
+                        @(hasPassport ? "✓ Uploaded" : "Required")
+                    </span>
+                </div>
+                <div class="req-doc-card @(hasNationalId ? "uploaded" : "")">
+                    <div class="req-doc-icon">🪪</div>
+                    <div class="req-doc-info">
+                        <strong>National ID / Iqama</strong>
+                        <small>Saudi or resident ID card</small>
+                    </div>
+                    <span class="req-doc-status @(hasNationalId ? "ok" : "missing")">
+                        @(hasNationalId ? "✓ Uploaded" : "Required")
+                    </span>
+                </div>
+                <div class="req-doc-card @(hasSelfie ? "uploaded" : "")">
+                    <div class="req-doc-icon">🤳</div>
+                    <div class="req-doc-info">
+                        <strong>Selfie / Profile Photo</strong>
+                        <small>Clear face photo for verification</small>
+                    </div>
+                    <span class="req-doc-status @(hasSelfie ? "ok" : "missing")">
+                        @(hasSelfie ? "✓ Uploaded" : "Required")
+                    </span>
+                </div>
+            </div>
+
+            <!-- Upload zone -->
+            <div class="upload-drop-zone">
+                <p style="margin:0 0 .5rem;color:#7A6658;font-size:0.9rem;">
+                    📎 Upload documents — select file type after choosing
+                </p>
+                <p style="margin:0 0 .75rem;color:#B0A090;font-size:0.8rem;">PDF, JPG, PNG · Max 10 MB each</p>
+                <InputFile OnChange="HandleFileUpload"
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           multiple
+                           class="form-control" />
+            </div>
+
+            <!-- Document type assignment (shown after file chosen) -->
+            @if (pendingDocType != null)
+            {
+                <div style="background:#FFF8DC;border:1.5px solid #C8873A;border-radius:8px;padding:1rem;margin-top:0.75rem;">
+                    <p style="margin:0 0 .6rem;font-size:0.88rem;font-weight:600;color:#5C3D00;">
+                        Categorize your uploaded file as:
+                    </p>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        @foreach (var t in docTypes)
+                        {
+                            var dt = t;
+                            <button style="padding:7px 16px;border-radius:6px;font-family:inherit;font-size:0.84rem;cursor:pointer;border:1.5px solid @(pendingDocType == dt ? "#7B3121" : "#C4A090");background:@(pendingDocType == dt ? "#7B3121" : "white");color:@(pendingDocType == dt ? "white" : "#5A3A2A");font-weight:600;"
+                                    @onclick="() => _ = AssignDocType(dt)">
+                                @dt
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(uploadMessage))
+            {
+                <div class="upload-msg @uploadMessageClass">@((MarkupString)uploadMessage)</div>
+            }
+
+            @if (uploadedDocs.Any())
+            {
+                <h4 style="margin:1.2rem 0 .75rem;color:#3A2A1E;">Uploaded Documents (@uploadedDocs.Count)</h4>
+                @foreach (var doc in uploadedDocs)
+                {
+                    var d = doc;
+                    <div class="doc-row">
+                        <div class="doc-info">
+                            <strong>@d.FileName</strong>
+                            <small>@d.DocCategory · @d.FileType · @d.FileSizeKb KB · @d.UploadedOn.ToString("MMM dd, yyyy")</small>
+                        </div>
+                        <div class="doc-actions">
+                            @if (!string.IsNullOrEmpty(d.FileUrl))
+                            {
+                                <a href="@d.FileUrl" target="_blank" class="btn-doc-view">View</a>
+                            }
+                            <button class="btn-doc-delete"
+                                    disabled="@d.IsDeleting"
+                                    @onclick="() => DeleteDocumentAsync(d)">
+                                @(d.IsDeleting ? "…" : "Delete")
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+
+    // ── View Models ───────────────────────────────────────────────────────────
+    private class VisitedPlace { public int DestId { get; set; } public string Name { get; set; } = ""; public string Province { get; set; } = ""; public string ImageUrl { get; set; } = ""; }
+    private class ReviewDisplay { public string DestName { get; set; } = ""; public int Stars { get; set; } public string Comment { get; set; } = ""; }
+    private class PackingList { public int Id { get; set; } public string TripName { get; set; } = ""; public List<PackingItem> Items { get; set; } = new(); }
+    private class PackingItem { public int Id { get; set; } public string Name { get; set; } = ""; public bool IsCompleted { get; set; } }
+    private class UploadedDoc
+    {
+        public int Id { get; set; } public string FileName { get; set; } = ""; public string FileType { get; set; } = "";
+        public string DocCategory { get; set; } = "Other"; public long FileSizeKb { get; set; }
+        public string? FileUrl { get; set; } public DateTime UploadedOn { get; set; } = DateTime.UtcNow; public bool IsDeleting { get; set; }
+    }
+    private class ProfileStats { public int PlacesVisited { get; set; } public int BookingsCompleted { get; set; } public int ReviewsWritten { get; set; } public int FavoritesCount { get; set; } }
+
+    // ── Profile completeness ─────────────────────────────────────────────────
+    // These reflect real-world booking requirements:
+    //   ✅ Full name | Phone | Nationality | Passport scan | National ID | Selfie
+    private bool hasName       => !string.IsNullOrWhiteSpace(userName) && userName != "Traveler";
+    private bool hasPhone      => !string.IsNullOrWhiteSpace(phoneNumber);
+    private bool hasNationality => !string.IsNullOrWhiteSpace(nationality);
+    private bool hasPassport   => uploadedDocs.Any(d => d.DocCategory == "Passport");
+    private bool hasNationalId => uploadedDocs.Any(d => d.DocCategory == "National ID");
+    private bool hasSelfie     => uploadedDocs.Any(d => d.DocCategory == "Selfie");
+
+    private int totalSteps     => 6;
+    private int completedSteps => (hasName ? 1 : 0) + (hasPhone ? 1 : 0) + (hasNationality ? 1 : 0) +
+                                  (hasPassport ? 1 : 0) + (hasNationalId ? 1 : 0) + (hasSelfie ? 1 : 0);
+    private int profileCompletionPct => (completedSteps * 100) / totalSteps;
+    private bool isProfileComplete => completedSteps == totalSteps;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    private string       userName        = "";
+    private string       userInitials    = "";
+    private string       userEmail       = "";
+    private string       phoneNumber     = "";
+    private string       nationality     = "";
+    private string       memberSince     = "";
+    private string       activeTab       = "places";
+    private string       returnUrl       = "";
+    private string       userId          = "";
+    private ProfileStats stats           = new();
+    private string       uploadMessage      = "";
+    private string       uploadMessageClass = "";
+    private string?      pendingDocType;
+
+    private static readonly string[] docTypes = { "Passport", "National ID", "Selfie", "Visa", "Ticket", "Other" };
+
+    private List<VisitedPlace>  visitedPlaces = new();
+    private List<ReviewDisplay> userReviews   = new();
+    private List<PackingList>   packingLists  = new();
+    private List<UploadedDoc>   uploadedDocs  = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Read tab and returnUrl from query string (e.g. from Checkout gate link)
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("tab", out var tab) && !string.IsNullOrEmpty(tab))
+            activeTab = tab.ToString();
+        if (query.TryGetValue("returnUrl", out var ret) && !string.IsNullOrEmpty(ret))
+            returnUrl = ret.ToString();
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = auth.User;
+
+        userId    = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+        userEmail = user.FindFirst(c => c.Type == ClaimTypes.Email)?.Value ?? "";
+        memberSince = DateTime.Now.ToString("MMMM yyyy");
+
+        // FIX 1: Read FullName from ApplicationUser.FullName directly via UserManager.
+        // Identity sets UserName = email, so user.Identity?.Name always returns the email.
+        // FullName is a dedicated column on ApplicationUser set at registration.
+        // FIX 3: Also load PhoneNumber and nationality from the DB record / claims,
+        // not from the auth cookie (which is stale until RefreshSignInAsync is called).
+        var appUser = await UserManager.FindByIdAsync(userId);
+        if (appUser != null)
+        {
+            userName = appUser.FullName ?? "";
+
+            // Fall back to first_name + last_name claims if FullName is not populated
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                var dbClaims = await UserManager.GetClaimsAsync(appUser);
+                var claimMap = dbClaims.GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.Last().Value);
+                var first = claimMap.GetValueOrDefault("first_name", "");
+                var last  = claimMap.GetValueOrDefault("last_name",  "");
+                userName  = (first + " " + last).Trim();
+                nationality = claimMap.GetValueOrDefault("nationality", "");
+            }
+            else
+            {
+                // FullName is set; still read nationality from claims
+                var dbClaims = await UserManager.GetClaimsAsync(appUser);
+                var claimMap = dbClaims.GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.Last().Value);
+                nationality = claimMap.GetValueOrDefault("nationality", "");
+            }
+
+            // FIX 3: PhoneNumber is a first-class column on ApplicationUser — read it directly
+            phoneNumber = appUser.PhoneNumber ?? "";
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+            userName = user.Identity?.Name ?? "Traveler";
+
+        userInitials = GetInitials(userName);
+
+        try
+        {
+            var favs = await UserFavoriteService.GetUserFavoritesAsync(userId);
+            stats.FavoritesCount = favs?.Count ?? 0;
+
+            if (favs != null && favs.Any())
+            {
+                var favDestIds = favs.Select(f => f.DestinationId).Distinct().ToList();
+                var destMap = (await DestinationService.GetByIdsAsync(favDestIds)).ToDictionary(d => d.Id);
+                visitedPlaces = favs.Where(f => destMap.ContainsKey(f.DestinationId))
+                    .Select(f => new VisitedPlace
+                    {
+                        DestId   = f.DestinationId,
+                        Name     = destMap[f.DestinationId].Name,
+                        Province = destMap[f.DestinationId].Province ?? "",
+                        ImageUrl = destMap[f.DestinationId].ImageUrl ?? "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400",
+                    }).ToList();
+            }
+            stats.PlacesVisited = visitedPlaces.Count;
+
+            var bookings = await BookingService.GetUserBookingsAsync(userId);
+            stats.BookingsCompleted = bookings?.Count(b => b.Status == "Completed") ?? 0;
+
+            var reviews = await ReviewService.GetByUserAsync(userId);
+            stats.ReviewsWritten = reviews?.Count ?? 0;
+            if (reviews != null && reviews.Any())
+            {
+                var revDestIds = reviews.Where(r => r.DestinationId.HasValue).Select(r => r.DestinationId!.Value).Distinct().ToList();
+                var revDestMap = (await DestinationService.GetByIdsAsync(revDestIds)).ToDictionary(d => d.Id);
+                userReviews = reviews.Select(rev =>
+                {
+                    var destName = rev.DestinationId.HasValue && revDestMap.TryGetValue(rev.DestinationId.Value, out var d) ? d.Name : "Unknown";
+                    return new ReviewDisplay { DestName = destName, Stars = rev.StarRating, Comment = rev.Comment ?? "" };
+                }).ToList();
+            }
+
+            var itineraries = await ItineraryService.GetUserItinerariesAsync(userId);
+            if (itineraries != null)
+            {
+                packingLists = itineraries.Select(itin => new PackingList
+                {
+                    Id       = itin.Id,
+                    TripName = itin.Title,
+                    Items    = itin.PackingItems?.Select(pi => new PackingItem { Id = pi.Id, Name = pi.ItemName, IsCompleted = pi.IsPacked }).ToList() ?? new()
+                }).ToList();
+            }
+
+            var existingDocs = await DocumentUploadService.GetUserDocumentsAsync(userId);
+            if (existingDocs != null)
+            {
+                uploadedDocs = existingDocs.Select(doc => new UploadedDoc
+                {
+                    Id          = doc.Id,
+                    FileName    = doc.FileName,
+                    FileType    = doc.FileType,
+                    DocCategory = doc.Category ?? "Other",
+                    FileSizeKb  = doc.FileSizeBytes / 1024,
+                    FileUrl     = doc.FileUrl,
+                    UploadedOn  = doc.UploadedOn,
+                }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[Profile] Data load error: " + ex.Message);
+        }
+    }
+
+    // ── Document upload ───────────────────────────────────────────────────────
+    private UploadedDoc? lastUploadedDoc;
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        const long maxSize = 10 * 1024 * 1024;
+        uploadMessage      = "Uploading...";
+        uploadMessageClass = "upload-progress";
+        pendingDocType     = null;
+        StateHasChanged();
+
+        var errors = new List<string>();
+        foreach (var file in e.GetMultipleFiles(5))
+        {
+            try
+            {
+                if (file.Size > maxSize) { errors.Add($"⚠️ {file.Name} exceeds 10 MB."); continue; }
+
+                using var stream = file.OpenReadStream(maxSize);
+                var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                var bytes = ms.ToArray();
+
+                var result = await DocumentUploadService.UploadAsync(userId, new UploadDocumentRequest(
+                    FileName    : file.Name,
+                    FileType    : Path.GetExtension(file.Name).TrimStart('.').ToUpper(),
+                    FileBytes   : bytes,
+                    ContentType : file.ContentType
+                ));
+
+                var newDoc = new UploadedDoc
+                {
+                    Id          = result.Id,
+                    FileName    = result.FileName,
+                    FileType    = result.FileType,
+                    DocCategory = "Other",    // user will categorize
+                    FileSizeKb  = file.Size / 1024,
+                    FileUrl     = result.FileUrl,
+                    UploadedOn  = DateTime.UtcNow,
+                };
+                uploadedDocs.Add(newDoc);
+                lastUploadedDoc = newDoc;
+                pendingDocType  = "Other";   // prompt categorization
+            }
+            catch (Exception ex) { errors.Add($"❌ {file.Name}: {ex.Message}"); }
+        }
+
+        uploadMessage      = errors.Any() ? string.Join(" | ", errors) : "✅ Uploaded. Please categorize the document below.";
+        uploadMessageClass = errors.Any() ? "upload-err" : "upload-ok";
+    }
+
+    private async Task AssignDocType(string docType)
+    {
+        if (lastUploadedDoc == null) return;
+        try
+        {
+            await DocumentUploadService.SetCategoryAsync(lastUploadedDoc.Id, docType);
+            lastUploadedDoc.DocCategory = docType;
+            pendingDocType     = null;
+            uploadMessage = string.IsNullOrEmpty(returnUrl)
+                ? $"✅ Document categorized as: {docType}."
+                : $"✅ Document categorized as: {docType}. <a href='{returnUrl}' style='color:#7B3121;font-weight:600;'>Return to checkout →</a>";
+            uploadMessageClass = "upload-ok";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Profile] SetCategoryAsync failed: {ex.Message}");
+            uploadMessage      = "Failed to categorize document. Please try again.";
+            uploadMessageClass = "upload-err";
+        }
+    }
+
+    private async Task DeleteDocumentAsync(UploadedDoc doc)
+    {
+        doc.IsDeleting = true;
+        try
+        {
+            await DocumentUploadService.DeleteAsync(doc.Id, userId);
+            uploadedDocs.Remove(doc);
+            uploadMessage      = "Document deleted.";
+            uploadMessageClass = "upload-ok";
+        }
+        catch (Exception ex)
+        {
+            doc.IsDeleting     = false;
+            uploadMessage      = $"Delete failed: {ex.Message}";
+            uploadMessageClass = "upload-err";
+        }
+    }
+
+    // FIX 6: Was a void method that only flipped item.IsCompleted in memory.
+    // On page refresh the checkbox reverted to the DB value because the toggle
+    // was never persisted. Now we call ItineraryService.TogglePackingItemAsync(itemId)
+    // to write to the DB, with an optimistic-UI flip that rolls back on failure.
+    private async Task TogglePackingItemAsync(PackingList list, PackingItem item)
+    {
+        item.IsCompleted = !item.IsCompleted;   // optimistic update
+        try
+        {
+            await ItineraryService.TogglePackingItemAsync(item.Id);
+        }
+        catch (Exception ex)
+        {
+            item.IsCompleted = !item.IsCompleted;  // roll back
+            Console.Error.WriteLine("[Profile] TogglePacking: " + ex.Message);
+        }
+    }
+
+    private static string StarString(int stars) => new string('★', stars) + new string('☆', Math.Max(0, 5 - stars));
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : name[0].ToString().ToUpper();
+    }
+}

@@ -1,0 +1,56 @@
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Nav
+
+<PageTitle>404 – Page Not Found | Dunes of Arabia</PageTitle>
+
+<div class="notfound-page">
+    <div class="notfound-card">
+        <div class="notfound-dune">🏜️</div>
+        <h1>404</h1>
+        <h2>Lost in the Desert?</h2>
+        <p>The page you're looking for has drifted away like sand in the wind. Let us guide you back.</p>
+        <div class="notfound-actions">
+            <button @onclick='() => Nav.NavigateTo("/")' class="btn-home">🏠 Back to Home</button>
+            <button @onclick='() => Nav.NavigateTo("/destinations")' class="btn-explore">🗺️ Explore Destinations</button>
+        </div>
+        <div class="notfound-links">
+            <a href="/activities">Activities</a> ·
+            <a href="/planner">Trip Planner</a> ·
+            <a href="/dashboard">My Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notfound-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #F5EFE8 0%, #E8DCC8 100%);
+        display: flex; align-items: center; justify-content: center;
+        padding: 2rem;
+    }
+    .notfound-card {
+        background: white;
+        border-radius: 20px;
+        padding: 3rem 3.5rem;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(123,49,33,0.12);
+        max-width: 520px; width: 100%;
+    }
+    .notfound-dune { font-size: 4rem; margin-bottom: 0.5rem; }
+    .notfound-card h1 { font-size: 5rem; font-weight: 900; color: #7B3121; margin: 0; line-height: 1; font-family: Georgia, serif; }
+    .notfound-card h2 { color: #2C1A12; font-size: 1.5rem; margin: 0.5rem 0; font-family: Georgia, serif; }
+    .notfound-card p  { color: #7A6658; font-size: 0.95rem; line-height: 1.6; margin: 1rem 0 2rem; }
+    .notfound-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .btn-home, .btn-explore {
+        padding: 0.75rem 1.5rem; border: none; border-radius: 8px;
+        cursor: pointer; font-weight: 600; transition: all 0.2s;
+        font-size: 0.9rem; font-family: inherit;
+    }
+    .btn-home    { background: #7B3121; color: white; }
+    .btn-home:hover    { background: #5C2218; }
+    .btn-explore { background: white; color: #7B3121; border: 2px solid #7B3121; }
+    .btn-explore:hover { background: #F5EFE8; }
+    .notfound-links { font-size: 0.85rem; color: #9A8878; }
+    .notfound-links a { color: #7B3121; font-weight: 600; text-decoration: none; margin: 0 4px; }
+    .notfound-links a:hover { text-decoration: underline; }
+</style>

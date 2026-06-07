@@ -1,0 +1,72 @@
+@page "/authentication/{action}"
+@layout DunesOfArabia.Components.Layout.MainLayout
+
+@* 
+   FIX CS0234: Removed @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+   — that namespace only exists in Blazor WebAssembly projects.
+   This is a Blazor Server app; authentication is handled by ASP.NET Core Identity
+   middleware, not the WASM RemoteAuthenticatorView component.
+   The page now shows a friendly splash and redirects to the correct route.
+*@
+
+@inject NavigationManager Nav
+
+<div class="auth-splash">
+    <div class="auth-card">
+        <div class="auth-spinner"></div>
+        @if (Action == "logout" || Action == "logged-out")
+        {
+            <h2>Signing you out…</h2>
+            <p>See you on your next adventure!</p>
+        }
+        else if (Action == "login-callback" || Action == "login-failed")
+        {
+            <h2>Almost there…</h2>
+            <p>Completing sign-in</p>
+        }
+        else
+        {
+            <h2>Signing you in…</h2>
+            <p>Preparing your Dunes of Arabia experience</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Action { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        // Redirect to home; actual login/logout is handled by Identity endpoints
+        Nav.NavigateTo("/", forceLoad: false);
+    }
+}
+
+<style>
+    .auth-splash {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #F5EFE8 0%, #E8DCC8 100%);
+        display: flex; align-items: center; justify-content: center;
+        padding: 2rem;
+    }
+    .auth-card {
+        background: white;
+        border-radius: 16px;
+        padding: 3rem 3.5rem;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(123,49,33,0.12);
+        border-top: 4px solid #7B3121;
+        max-width: 380px; width: 100%;
+    }
+    .auth-card h2 { color: #7B3121; margin: 1rem 0 0.5rem; font-family: Georgia, serif; }
+    .auth-card p  { color: #9A8878; font-size: 0.9rem; margin: 0; }
+    .auth-spinner {
+        width: 48px; height: 48px;
+        border: 4px solid #F0E8DC;
+        border-top: 4px solid #7B3121;
+        border-radius: 50%;
+        animation: auth-spin 0.9s linear infinite;
+        margin: 0 auto;
+    }
+    @@keyframes auth-spin { to { transform: rotate(360deg); } }
+</style>

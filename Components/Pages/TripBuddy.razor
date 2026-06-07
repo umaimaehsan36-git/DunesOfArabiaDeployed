@@ -1,0 +1,1045 @@
+@page "/trip-buddy"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+
+@attribute [Authorize]
+@implements IAsyncDisposable
+
+@inject IDestinationService DestinationService
+@inject ITripBuddyService TripBuddyService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>Trip Buddy – Find Co-Travelers | Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+
+    .buddy-page { background: #F5EFE8; min-height: 100vh; font-family: 'Lato', sans-serif; padding: 2rem; }
+    .page-header { margin-bottom: 1.8rem; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; color: #1C1008; font-weight: 700; margin-bottom: 0.3rem; }
+    .page-header p { font-size: 0.88rem; color: #8A7566; font-weight: 300; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 360px; gap: 1.5rem; align-items: start; }
+
+    /* ── Post a Trip Card ── */
+    .post-card { background: white; border-radius: 14px; padding: 1.6rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 1rem; }
+    .post-card h2 { font-family: 'Playfair Display', serif; font-size: 1.15rem; color: #1C1008; margin: 0 0 1.2rem; border-bottom: 2px solid #7B3121; padding-bottom: 0.5rem; }
+    .fg { margin-bottom: 1rem; }
+    .fg label { display: block; font-size: 0.83rem; font-weight: 600; color: #3A2A1E; margin-bottom: 4px; }
+    .fg select, .fg input, .fg textarea { width: 100%; border: 1.5px solid #D8CCC4; border-radius: 8px; padding: 9px 12px; font-size: 0.88rem; background: #FDFAF7; color: #333; box-sizing: border-box; font-family: inherit; outline: none; transition: border-color 0.18s; }
+    .fg select:focus, .fg input:focus, .fg textarea:focus { border-color: #7B3121; }
+    .fg textarea { resize: vertical; min-height: 80px; }
+    .btn-post { width: 100%; background: #7B3121; color: white; border: none; padding: 11px; border-radius: 10px; cursor: pointer; font-size: 0.92rem; font-weight: 600; font-family: inherit; transition: background 0.2s; margin-top: 0.4rem; }
+    .btn-post:hover:not(:disabled) { background: #5C2218; }
+    .btn-post:disabled { opacity: 0.55; cursor: not-allowed; }
+    .alert-ok  { background: #e6f4ea; color: #2e7d32; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.88rem; }
+    .alert-err { background: #fce4ec; color: #c62828; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.88rem; }
+
+    /* ── Filters ── */
+    .filters-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.2rem; align-items: center; }
+    .filter-chip { padding: 7px 16px; border-radius: 6px; font-size: 0.83rem; font-weight: 500; border: 1.5px solid #C4A090; background: white; color: #5A3A2A; cursor: pointer; font-family: inherit; transition: all 0.18s; }
+    .filter-chip.active { background: #7B3121; border-color: #7B3121; color: white; }
+    .filter-chip:hover:not(.active) { border-color: #7B3121; color: #7B3121; }
+    .search-input { padding: 8px 14px; border: 1.5px solid #C4A090; border-radius: 8px; font-size: 0.84rem; font-family: inherit; outline: none; transition: border-color 0.18s; flex: 1; min-width: 180px; }
+    .search-input:focus { border-color: #7B3121; }
+
+    /* ── Trip Posts ── */
+    .section-title { font-family: 'Playfair Display', serif; font-size: 1.15rem; color: #1C1008; font-weight: 700; margin-bottom: 1rem; }
+    .trip-post { background: white; border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #C8873A; display: flex; flex-direction: column; gap: 0.75rem; transition: box-shadow 0.2s; }
+    .trip-post:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+    .trip-post.own { border-left-color: #7B3121; }
+    .post-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .post-avatar { width: 42px; height: 42px; border-radius: 50%; background: #7B3121; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+    .post-user-name { font-weight: 700; font-size: 0.92rem; color: #1C1008; }
+    .post-date-posted { font-size: 0.76rem; color: #9A8878; margin-top: 2px; }
+    .post-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .post-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-dest { background: #FAF0E8; color: #7B3121; }
+    .badge-budget { background: #FFF8DC; color: #7A5A00; }
+    .badge-type { background: #EAF4FE; color: #1A4E8A; }
+    .badge-open { background: #E8F5E9; color: #2E7D32; }
+    .badge-closed { background: #F5F5F5; color: #888; }
+    .post-destination { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: #1C1008; font-weight: 700; }
+    .post-dates { font-size: 0.83rem; color: #7A6658; display: flex; align-items: center; gap: 0.4rem; }
+    .post-bio { font-size: 0.86rem; color: #555; line-height: 1.6; }
+    .post-spots { font-size: 0.82rem; color: #7A6658; }
+    .post-spots strong { color: #7B3121; }
+    .post-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .btn-request { background: #7B3121; color: white; border: none; padding: 8px 18px; border-radius: 7px; cursor: pointer; font-family: inherit; font-size: 0.84rem; font-weight: 600; transition: background 0.18s; }
+    .btn-request:hover:not(:disabled) { background: #5C2218; }
+    .btn-request:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-request.sent { background: #2E7D32; }
+    .btn-message { background: white; color: #7B3121; border: 1.5px solid #7B3121; padding: 7px 16px; border-radius: 7px; cursor: pointer; font-family: inherit; font-size: 0.84rem; font-weight: 600; transition: all 0.18s; }
+    .btn-message:hover { background: #F5EFE8; }
+    .own-badge { background: #7B3121; color: white; font-size: 0.72rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+    /* ── Join Requests Panel (owner inbox) ── */
+    .requests-panel { background: white; border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #C8873A; }
+    .requests-panel h3 { font-family: 'Playfair Display', serif; font-size: 1rem; color: #1C1008; margin: 0 0 1rem; }
+    .request-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid #F0E8E0; }
+    .request-row:last-child { border-bottom: none; }
+    .request-info { font-size: 0.85rem; color: #333; }
+    .request-info strong { color: #1C1008; }
+    .request-info span { color: #9A8878; font-size: 0.78rem; }
+    .request-actions { display: flex; gap: 0.4rem; }
+    .btn-accept { background: #2E7D32; color: white; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; font-family: inherit; }
+    .btn-accept:hover { background: #1B5E20; }
+    .btn-reject { background: white; color: #C62828; border: 1.5px solid #C62828; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; font-family: inherit; }
+    .btn-reject:hover { background: #FFF0EE; }
+    .status-badge { font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .status-accepted { background: #E8F5E9; color: #2E7D32; }
+    .status-rejected { background: #FDECEA; color: #C62828; }
+
+    /* ── Chat Modal ── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15,8,3,0.5); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(2px); }
+    .chat-modal { background: white; border-radius: 16px; width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.2); overflow: hidden; }
+    .chat-header { background: linear-gradient(135deg, #7B3121, #C8873A); padding: 1.1rem 1.5rem; color: white; display: flex; justify-content: space-between; align-items: center; }
+    .chat-header-left { flex: 1; min-width: 0; }
+    .chat-header-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; }
+    .chat-header-dest { font-size: 0.78rem; opacity: 0.85; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; flex-shrink: 0; margin-left: 0.75rem; }
+    .live-badge { display: flex; align-items: center; gap: 0.35rem; font-size: 0.73rem; }
+    .live-dot { width: 8px; height: 8px; background: #4CAF50; border-radius: 50%; animation: pulse 2s infinite; flex-shrink: 0; }
+    .live-text { color: #A5D6A7; font-weight: 700; }
+    .live-freq { color: rgba(255,255,255,0.6); }
+    .btn-close-chat { background: rgba(255,255,255,0.15); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-close-chat:hover { background: rgba(255,255,255,0.28); }
+
+    /* Chat tabs (for owner to switch between requester threads) */
+    .chat-tabs { display: flex; overflow-x: auto; background: #F5EFE8; border-bottom: 1px solid #E0D4C8; gap: 0; scrollbar-width: none; }
+    .chat-tabs::-webkit-scrollbar { display: none; }
+    .chat-tab { padding: 0.55rem 1rem; font-size: 0.8rem; font-weight: 600; color: #7A6658; border: none; background: transparent; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; font-family: inherit; transition: all 0.15s; }
+    .chat-tab.active { color: #7B3121; border-bottom-color: #7B3121; background: white; }
+    .chat-tab:hover:not(.active) { background: rgba(255,255,255,0.5); }
+
+    .chat-messages { flex: 1; overflow-y: auto; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; background: #F5EFE8; min-height: 0; }
+    .chat-msg { max-width: 80%; display: flex; flex-direction: column; gap: 2px; }
+    .chat-msg.mine   { align-self: flex-end;  align-items: flex-end;   }
+    .chat-msg.theirs { align-self: flex-start; align-items: flex-start; }
+    .chat-msg.system-msg { align-self: center; align-items: center; max-width: 90%; }
+    .chat-bubble { padding: 0.65rem 1rem; border-radius: 12px; font-size: 0.87rem; line-height: 1.5; word-break: break-word; }
+    .chat-msg.mine   .chat-bubble { background: #7B3121; color: white; border-radius: 12px 12px 2px 12px; }
+    .chat-msg.theirs .chat-bubble { background: white; color: #1C1008; border-radius: 12px 12px 12px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .chat-msg.system-msg .chat-bubble { background: rgba(0,0,0,0.06); color: #7A6658; font-size: 0.78rem; border-radius: 8px; text-align: center; }
+    .chat-sender-name { font-size: 0.7rem; color: #9A8878; margin-bottom: 1px; }
+    .chat-time { font-size: 0.68rem; color: #9A8878; }
+    .chat-last-updated { text-align: center; font-size: 0.71rem; color: #9A8878; padding: 0.35rem 0 0.1rem; border-top: 1px dashed #E0D4C8; margin-top: 0.25rem; }
+    .chat-input-row { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; background: white; border-top: 1px solid #EAE0D8; }
+    .chat-input { flex: 1; border: 1.5px solid #D8CCC4; border-radius: 20px; padding: 0.6rem 1rem; font-family: inherit; font-size: 0.88rem; outline: none; transition: border-color 0.18s; }
+    .chat-input:focus { border-color: #7B3121; }
+    .btn-send { background: #7B3121; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.18s; }
+    .btn-send:hover:not(:disabled) { background: #5C2218; }
+    .btn-send:disabled { opacity: 0.4; }
+
+    /* Empty / loading */
+    .empty-state { background: white; border-radius: 14px; padding: 3rem; text-align: center; color: #9A8878; }
+    .loading-spinner { text-align: center; padding: 3rem; color: #7B3121; }
+
+    /* Pulse animation for Live dot */
+    @@keyframes pulse {
+        0%,  100% { opacity: 1;   transform: scale(1);   }
+        50%        { opacity: 0.4; transform: scale(0.75); }
+    }
+
+    @@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } .post-card { position: static; } }
+</style>
+
+<div class="buddy-page">
+
+    <div class="page-header">
+        <h1>🤝 Trip Buddy</h1>
+        <p>Find co-travelers planning trips to the same destination — split costs, share experiences, make friends!</p>
+    </div>
+
+    <div class="two-col">
+
+        <!-- ══ LEFT: Trip posts list ══ -->
+        <div>
+
+            <!-- Owner's join-request inbox (shown whenever current user has any requests on their posts) -->
+            @if (allRequests.Any())
+            {
+                <div class="requests-panel">
+                    <h3>📬 Join Requests for Your Trips
+                        @if (pendingRequests.Any())
+                        {
+                            <span style="background:#7B3121;color:white;font-size:0.72rem;padding:2px 8px;border-radius:20px;margin-left:6px;font-weight:600;">@pendingRequests.Count() pending</span>
+                        }
+                    </h3>
+                    @foreach (var req in allRequests)
+                    {
+                        var r = req;
+                        var postName = allPosts.FirstOrDefault(p => p.Id == r.PostId)?.DestinationName ?? "your trip";
+                        <div class="request-row">
+                            <div class="request-info">
+                                <strong>@r.RequesterName</strong> wants to join <strong>@postName</strong>
+                                <br /><span>@r.RequestedAgo</span>
+                            </div>
+                            <div class="request-actions">
+                                @if (r.Status == "Pending")
+                                {
+                                    <button class="btn-accept" @onclick="() => AcceptRequest(r)">✓ Accept</button>
+                                    <button class="btn-reject" @onclick="() => RejectRequest(r)">✕ Decline</button>
+                                }
+                                else
+                                {
+                                    <span class="status-badge @(r.Status == "Accepted" ? "status-accepted" : "status-rejected")">
+                                        @r.Status
+                                    </span>
+                                    @if (r.Status == "Accepted")
+                                    {
+                                        <button class="btn-message" style="padding:4px 10px;font-size:0.78rem;"
+                                                @onclick="() => OpenChatWithRequester(r)">💬 Chat</button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="filters-row">
+                <input class="search-input" placeholder="🔍 Search by destination..."
+                       @bind="searchQuery" @bind:event="oninput" />
+                <button class="filter-chip @(destFilter == "" ? "active" : "")" @onclick='() => destFilter = ""'>All Destinations</button>
+                @foreach (var d in topDestinations)
+                {
+                    var dest = d;
+                    <button class="filter-chip @(destFilter == dest.Name ? "active" : "")"
+                            @onclick="() => destFilter = dest.Name">
+                        @dest.Name
+                    </button>
+                }
+            </div>
+
+            <div class="section-title">
+                @filteredPosts.Count() trip @(filteredPosts.Count() == 1 ? "post" : "posts") found
+                @if (!string.IsNullOrEmpty(destFilter)) { <span style="font-size:0.85rem;font-weight:400;color:#9A8878;"> for @destFilter</span> }
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="loading-spinner">Loading trip posts…</div>
+            }
+            else if (!filteredPosts.Any())
+            {
+                <div class="empty-state">
+                    <p style="font-size:2rem;margin-bottom:.5rem;">🏜️</p>
+                    <h3 style="color:#7B3121;font-family:'Playfair Display',serif;">No trips found</h3>
+                    <p>Be the first to post a trip to @(string.IsNullOrEmpty(destFilter) ? "Saudi Arabia" : destFilter)!</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var post in filteredPosts)
+                {
+                    var p = post;
+                    var isOwn   = p.UserId == currentUserId;
+                    var hasSent = sentRequests.Contains(p.Id);
+                    <div @key="p.Id" class="trip-post @(isOwn ? "own" : "")">
+                        <div class="post-top">
+                            <div style="display:flex;align-items:center;gap:0.75rem;flex:1;">
+                                <div class="post-avatar">@GetInitials(p.DisplayName)</div>
+                                <div>
+                                    <div class="post-user-name">
+                                        @p.DisplayName
+                                        @if (isOwn) { <span class="own-badge" style="margin-left:6px;">You</span> }
+                                    </div>
+                                    <div class="post-date-posted">Posted @p.PostedAgo</div>
+                                </div>
+                            </div>
+                            <div class="post-badges">
+                                <span class="post-badge badge-dest">@p.DestinationName</span>
+                                <span class="post-badge badge-type">@p.TripType</span>
+                                <span class="post-badge @(p.IsOpen ? "badge-open" : "badge-closed")">
+                                    @(p.IsOpen ? "🟢 Open" : "🔴 Full")
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="post-destination">📍 @p.DestinationName</div>
+                        <div class="post-dates">
+                            📅 @p.StartDate.ToString("MMM d") – @p.EndDate.ToString("MMM d, yyyy")
+                            &nbsp;·&nbsp;
+                            💰 Budget: @p.BudgetRange
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(p.Bio))
+                        {
+                            <div class="post-bio">@p.Bio</div>
+                        }
+
+                        <div class="post-spots">
+                            <strong>@p.SpotsLeft</strong> spot@(p.SpotsLeft != 1 ? "s" : "") remaining out of @p.TotalSpots
+                        </div>
+
+                        @if (!isOwn)
+                        {
+                            <div class="post-actions">
+                                @if (p.IsOpen)
+                                {
+                                    <button class="btn-request @(hasSent ? "sent" : "")"
+                                            @onclick="() => SendJoinRequest(p)"
+                                            disabled="@(hasSent || isSendingRequest)">
+                                        @if (hasSent) { <span>✓ Request Sent</span> }
+                                        else { <span>🤝 Request to Join</span> }
+                                    </button>
+                                }
+                                <button class="btn-message" @onclick="() => OpenChatAsVisitor(p)">
+                                    💬 Message
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="post-actions">
+                                @{ var postReqCount = pendingRequests.Count(r => r.PostId == p.Id); }
+                                <button class="btn-message" @onclick="() => OpenOwnerInbox(p)">
+                                    📬 Requests @(postReqCount > 0 ? $"({postReqCount})" : "")
+                                </button>
+                                <button class="btn-message" style="background:#FFF0EE;color:#C62828;border-color:#C62828;"
+                                        @onclick="() => DeletePost(p)">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- ══ RIGHT: Post a trip form ══ -->
+        <div class="post-card">
+            <h2>✈️ Post Your Trip</h2>
+
+            @if (!string.IsNullOrEmpty(postOkMsg))  { <div class="alert-ok">@postOkMsg</div>  }
+            @if (!string.IsNullOrEmpty(postErrMsg)) { <div class="alert-err">@postErrMsg</div> }
+
+            <div class="fg">
+                <label>Destination *</label>
+                <select @bind="formDestinationId">
+                    <option value="0">— Choose destination —</option>
+                    @foreach (var d in allDestinations)
+                    {
+                        <option value="@d.Id">@d.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="fg">
+                <label>Start Date *</label>
+                <input type="date" @bind="formStartDate" @bind:format="yyyy-MM-dd" min="@minDate" />
+            </div>
+
+            <div class="fg">
+                <label>End Date *</label>
+                <input type="date" @bind="formEndDate" @bind:format="yyyy-MM-dd" min="@minDate" />
+            </div>
+
+            <div class="fg">
+                <label>Trip Type</label>
+                <select @bind="formTripType">
+                    <option value="Adventure">Adventure</option>
+                    <option value="Cultural">Cultural</option>
+                    <option value="Relaxation">Relaxation</option>
+                    <option value="Family">Family</option>
+                    <option value="Business">Business</option>
+                </select>
+            </div>
+
+            <div class="fg">
+                <label>Budget Range</label>
+                <select @bind="formBudget">
+                    <option value="Budget (SR 500–1500)">Budget (SR 500–1500)</option>
+                    <option value="Mid-range (SR 1500–4000)">Mid-range (SR 1500–4000)</option>
+                    <option value="Luxury (SR 4000+)">Luxury (SR 4000+)</option>
+                </select>
+            </div>
+
+            <div class="fg">
+                <label>Total Spots (including you)</label>
+                <select @bind="formTotalSpots">
+                    <option value="2">2 people</option>
+                    <option value="3">3 people</option>
+                    <option value="4">4 people</option>
+                    <option value="5">5 people</option>
+                    <option value="6">6+ people</option>
+                </select>
+            </div>
+
+            <div class="fg">
+                <label>Tell others about yourself &amp; your trip</label>
+                <textarea maxlength="400" placeholder="e.g. I'm a solo traveler, love hiking and photography. Looking for someone to split costs on a 5-day AlUla trip!"
+                          @bind="formBio" @bind:event="oninput"></textarea>
+                <div style="font-size:0.75rem;color:#aaa;text-align:right;margin-top:2px;">@formBio.Length / 400</div>
+            </div>
+
+            <button class="btn-post" disabled="@(isPosting || formDestinationId == 0 || !formStartDate.HasValue || !formEndDate.HasValue)"
+                    @onclick="PostTripAsync">
+                @(isPosting ? "Posting…" : "🚀 Post My Trip")
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ══ CHAT MODAL ══ -->
+@if (chatTarget != null)
+{
+    <div class="modal-backdrop" @onclick="CloseChat">
+        <div class="chat-modal" @onclick:stopPropagation="true">
+
+            <!-- Header with Live badge -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <div class="chat-header-name">💬 @chatTarget.DisplayName</div>
+                    <div class="chat-header-dest">📍 @chatTarget.DestinationName · @chatTarget.StartDate.ToString("MMM d") – @chatTarget.EndDate.ToString("MMM d, yyyy")</div>
+                </div>
+                <div class="chat-header-right">
+                    <div class="live-badge">
+                        <span class="live-dot"></span>
+                        <span class="live-text">Live</span>
+                        <span class="live-freq">· updates every 5s</span>
+                    </div>
+                    <button class="btn-close-chat" @onclick="CloseChat">✕</button>
+                </div>
+            </div>
+
+            <!-- Tab bar: owner sees one tab per requester; visitor sees single thread -->
+            @if (chatTabs.Count > 1)
+            {
+                <div class="chat-tabs">
+                    @foreach (var tab in chatTabs)
+                    {
+                        var t = tab;
+                        <button class="chat-tab @(activeChatPartnerId == t.UserId ? "active" : "")"
+                                @onclick="() => SwitchChatTab(t)">
+                            @t.DisplayName
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- Messages -->
+            <div class="chat-messages" @ref="messagesContainer">
+                @if (!chatMessages.Any())
+                {
+                    <div style="text-align:center;color:#9A8878;font-size:0.85rem;padding:2rem 1rem;">
+                        Say hello! Introduce yourself and ask about joining their trip. 👋
+                    </div>
+                }
+                @foreach (var msg in chatMessages)
+                {
+                    var isMine  = msg.SenderId == currentUserId;
+                    var isSystem = msg.SenderId == "system";
+                    <div class="chat-msg @(isSystem ? "system-msg" : isMine ? "mine" : "theirs")">
+                        @if (!isMine && !isSystem)
+                        {
+                            <div class="chat-sender-name">@msg.SenderName</div>
+                        }
+                        <div class="chat-bubble">@msg.Text</div>
+                        @if (!isSystem)
+                        {
+                            <div class="chat-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                        }
+                    </div>
+                }
+                <!-- Last-updated timestamp so teacher can see real-time proof -->
+                <div class="chat-last-updated">Last updated: @chatLastUpdated.ToString("HH:mm:ss")</div>
+            </div>
+
+            <div class="chat-input-row">
+                <input class="chat-input" placeholder="Type a message…" @bind="chatDraft"
+                       @bind:event="oninput"
+                       @onkeydown="OnChatKeyDown" />
+                <button class="btn-send" @onclick="SendChatMessage" disabled="@string.IsNullOrWhiteSpace(chatDraft)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    // ── View models ───────────────────────────────────────────────────────────
+    private class TripPost
+    {
+        public int      Id              { get; set; }
+        public string   UserId          { get; set; } = "";
+        public string   DisplayName     { get; set; } = "";
+        public int      DestinationId   { get; set; }
+        public string   DestinationName { get; set; } = "";
+        public DateTime StartDate       { get; set; }
+        public DateTime EndDate         { get; set; }
+        public string   TripType        { get; set; } = "Adventure";
+        public string   BudgetRange     { get; set; } = "";
+        public string   Bio             { get; set; } = "";
+        public int      TotalSpots      { get; set; } = 2;
+        public int      SpotsLeft       { get; set; } = 1;
+        public bool     IsOpen          => SpotsLeft > 0;
+        // Computed dynamically — never goes stale
+        public string   PostedAgo       => GetTimeAgo(CreatedAt);
+        public DateTime CreatedAt       { get; set; } = DateTime.Now;
+
+        private static string GetTimeAgo(DateTime dt)
+        {
+            var diff = DateTime.Now - dt;
+            if (diff.TotalMinutes < 1) return "Just now";
+            if (diff.TotalHours   < 1) return $"{(int)diff.TotalMinutes}m ago";
+            if (diff.TotalDays    < 1) return $"{(int)diff.TotalHours}h ago";
+            if (diff.TotalDays    < 7) return $"{(int)diff.TotalDays}d ago";
+            return dt.ToString("MMM d");
+        }
+    }
+
+    private class ChatMessage
+    {
+        public string   SenderId   { get; set; } = "";
+        public string   SenderName { get; set; } = "";
+        public string   Text       { get; set; } = "";
+        public DateTime SentAt     { get; set; } = DateTime.UtcNow;
+    }
+
+    // Minimal model for join-request display in the inbox panel
+    private class RequestViewModel
+    {
+        public int    Id            { get; set; }
+        public int    PostId        { get; set; }
+        public string RequesterId   { get; set; } = "";
+        public string RequesterName { get; set; } = "";
+        public string Status        { get; set; } = "Pending";
+        public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+        public string RequestedAgo  => GetTimeAgo(RequestedAt);
+
+        private static string GetTimeAgo(DateTime dt)
+        {
+            var diff = DateTime.Now - dt;
+            if (diff.TotalMinutes < 1) return "Just now";
+            if (diff.TotalHours   < 1) return $"{(int)diff.TotalMinutes}m ago";
+            if (diff.TotalDays    < 1) return $"{(int)diff.TotalHours}h ago";
+            return $"{(int)diff.TotalDays}d ago";
+        }
+    }
+
+    // Tab entry for the owner's multi-requester chat tabs
+    private class ChatTab
+    {
+        public string UserId      { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+    }
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    private string currentUserId   = "";
+    private string currentUserName = "";
+    private bool   isLoading        = true;
+    private bool   isPosting        = false;
+    private bool   isSendingRequest = false;
+    private string searchQuery      = "";
+    private string destFilter       = "";
+    private string postOkMsg        = "";
+    private string postErrMsg       = "";
+    private string minDate          = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+
+    private List<TripPost>         allPosts        = new();
+    private List<Destination>      allDestinations = new();
+    private List<Destination>      topDestinations = new();
+    private HashSet<int>           sentRequests    = new();
+    private List<RequestViewModel> allRequests     = new();
+
+    // Form fields
+    private int       formDestinationId = 0;
+    private DateTime? formStartDate;
+    private DateTime? formEndDate;
+    private string    formTripType   = "Adventure";
+    private string    formBudget     = "Mid-range (SR 1500–4000)";
+    private int       formTotalSpots = 2;
+    private string    formBio        = "";
+
+    // Chat state
+    private TripPost?         chatTarget         = null;
+    private List<ChatMessage> chatMessages       = new();
+    private string            chatDraft          = "";
+    private ElementReference  messagesContainer;
+    private System.Threading.Timer? chatPollTimer;
+    private System.Threading.Timer? requestPollTimer;   // ← NEW: polls for new join requests
+    private DateTime          chatLastUpdated    = DateTime.Now;
+
+    // Multi-thread tabs (owner sees one tab per requester)
+    private List<ChatTab> chatTabs          = new();
+    private string        activeChatPartnerId = "";
+
+    // ── Computed ──────────────────────────────────────────────────────────────
+    private IEnumerable<TripPost> filteredPosts => allPosts
+        .Where(p => string.IsNullOrEmpty(destFilter) || p.DestinationName == destFilter)
+        .Where(p => string.IsNullOrEmpty(searchQuery) ||
+                    p.DestinationName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    p.Bio.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(p => p.CreatedAt);
+
+    private IEnumerable<RequestViewModel> pendingRequests =>
+        allRequests.Where(r => r.Status == "Pending");
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUserId   = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        currentUserName = auth.User.Identity?.Name ?? "Traveler";
+
+        try
+        {
+            allDestinations = await DestinationService.GetAllAsync();
+            topDestinations = allDestinations.Take(5).ToList();
+
+            var posts = await TripBuddyService.GetAllPostsAsync();
+            allPosts = posts.Select(MapToViewModel).ToList();
+
+            // Load join requests for posts owned by the current user
+            await LoadMyRequests();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] Init: " + ex.Message);
+            LoadDemoData();
+        }
+        finally
+        {
+            isLoading = false;
+            // Poll every 10 seconds so the owner's inbox refreshes automatically
+            // without needing a page reload when someone sends a join request.
+            StartRequestPollTimer();
+        }
+    }
+
+    // ── Background poll: refresh join requests every 10 s ────────────────────
+    private void StartRequestPollTimer()
+    {
+        requestPollTimer?.Dispose();
+        requestPollTimer = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadMyRequests();
+                    StateHasChanged();
+                });
+            }
+            catch { /* non-fatal */ }
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private TripPost MapToViewModel(TripBuddyPost p) => new TripPost
+    {
+        Id              = p.Id,
+        UserId          = p.UserId,
+        DisplayName     = p.DisplayName,
+        DestinationId   = p.DestinationId,
+        DestinationName = allDestinations.FirstOrDefault(d => d.Id == p.DestinationId)?.Name ?? p.DestinationName,
+        StartDate       = p.StartDate,
+        EndDate         = p.EndDate,
+        TripType        = p.TripType,
+        BudgetRange     = p.BudgetRange,
+        Bio             = p.Bio,
+        TotalSpots      = p.TotalSpots,
+        SpotsLeft       = p.SpotsLeft,
+        CreatedAt       = p.CreatedAt,
+    };
+
+    // Load all join requests for the current user's own posts
+    private async Task LoadMyRequests()
+    {
+        try
+        {
+            var myPostIds = allPosts.Where(p => p.UserId == currentUserId).Select(p => p.Id).ToHashSet();
+            if (!myPostIds.Any()) return;
+
+            var requests = await TripBuddyService.GetRequestsForOwnerAsync(currentUserId);
+            allRequests = requests.Select(r => new RequestViewModel
+            {
+                Id            = r.Id,
+                PostId        = r.PostId,
+                RequesterId   = r.RequesterId,
+                RequesterName = r.RequesterName ?? r.RequesterId,
+                Status        = r.Status,
+                RequestedAt   = r.RequestedAt,
+            }).ToList();
+
+            // Also mark posts where current user already sent a request
+            var myRequests = await TripBuddyService.GetMyRequestsAsync(currentUserId);
+            foreach (var req in myRequests)
+                sentRequests.Add(req.PostId);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] LoadRequests: " + ex.Message);
+        }
+    }
+
+    private void LoadDemoData()
+    {
+        allPosts = new List<TripPost>
+        {
+            new TripPost { Id=1, UserId="demo1", DisplayName="Sara A.",      DestinationId=3,  DestinationName="AlUla",          StartDate=DateTime.Today.AddDays(20), EndDate=DateTime.Today.AddDays(25), TripType="Cultural",   BudgetRange="Mid-range (SR 1500–4000)", Bio="Solo traveler, love history and photography. Want to split the cost of the AlUla heritage tour!", TotalSpots=3, SpotsLeft=2, CreatedAt=DateTime.Now.AddHours(-3) },
+            new TripPost { Id=2, UserId="demo2", DisplayName="Mohammed K.", DestinationId=7,  DestinationName="Riyadh Desert",  StartDate=DateTime.Today.AddDays(15), EndDate=DateTime.Today.AddDays(17), TripType="Adventure",  BudgetRange="Budget (SR 500–1500)",    Bio="Planning a desert safari weekend. Looking for 1-2 people to join and split the 4x4 rental.", TotalSpots=4, SpotsLeft=2, CreatedAt=DateTime.Now.AddDays(-1) },
+            new TripPost { Id=3, UserId="demo3", DisplayName="Aisha R.",    DestinationId=12, DestinationName="Jeddah (Red Sea)",StartDate=DateTime.Today.AddDays(30), EndDate=DateTime.Today.AddDays(34), TripType="Relaxation", BudgetRange="Luxury (SR 4000+)",       Bio="Looking for a travel buddy for a Red Sea diving and snorkeling trip. PADI certified!", TotalSpots=2, SpotsLeft=1, CreatedAt=DateTime.Now.AddHours(-8) },
+        };
+    }
+
+    // ── Post a trip ───────────────────────────────────────────────────────────
+    private async Task PostTripAsync()
+    {
+        postOkMsg = ""; postErrMsg = "";
+        if (formDestinationId == 0 || !formStartDate.HasValue || !formEndDate.HasValue) return;
+        if (formEndDate <= formStartDate) { postErrMsg = "End date must be after start date."; return; }
+
+        isPosting = true;
+        try
+        {
+            var destName = allDestinations.FirstOrDefault(d => d.Id == formDestinationId)?.Name ?? "";
+            var post = new TripBuddyPost
+            {
+                UserId          = currentUserId,
+                DisplayName     = currentUserName,
+                DestinationId   = formDestinationId,
+                DestinationName = destName,
+                StartDate       = formStartDate!.Value,
+                EndDate         = formEndDate!.Value,
+                TripType        = formTripType,
+                BudgetRange     = formBudget,
+                Bio             = formBio,
+                TotalSpots      = formTotalSpots,
+                SpotsLeft       = formTotalSpots - 1,
+                CreatedAt       = DateTime.UtcNow,
+            };
+            await TripBuddyService.CreatePostAsync(post);
+
+            // Reload full list from DB
+            var freshPosts = await TripBuddyService.GetAllPostsAsync();
+            allPosts = freshPosts.Select(MapToViewModel).ToList();
+
+            postOkMsg = "✅ Your trip has been posted! Others can now find and join you.";
+            formDestinationId = 0; formStartDate = null; formEndDate = null; formBio = "";
+        }
+        catch (Exception ex)
+        {
+            postErrMsg = "Failed to post. Please try again.";
+            Console.Error.WriteLine("[TripBuddy] Post: " + ex.Message);
+        }
+        finally { isPosting = false; }
+    }
+
+    // ── Join request (visitor sends request → auto-opens chat) ────────────────
+    private async Task SendJoinRequest(TripPost post)
+    {
+        isSendingRequest = true;
+        try
+        {
+            await TripBuddyService.SendJoinRequestAsync(post.Id, currentUserId, currentUserName);
+            sentRequests.Add(post.Id);   // only mark sent after DB success
+
+            // Reload the owner's request inbox in case the current user is viewing their own posts too
+            await LoadMyRequests();
+            StateHasChanged();
+
+            await OpenChatAsVisitor(post);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] JoinRequest: " + ex.Message);
+        }
+        finally { isSendingRequest = false; }
+    }
+
+    // ── Accept / Reject (owner actions) ──────────────────────────────────────
+    private async Task AcceptRequest(RequestViewModel req)
+    {
+        try
+        {
+            await TripBuddyService.UpdateJoinRequestAsync(req.Id, "Accepted", currentUserId);
+            req.Status = "Accepted";
+
+            // Refresh spot count on the matching post from DB to stay in sync
+            var freshPosts = await TripBuddyService.GetAllPostsAsync();
+            foreach (var fp in freshPosts)
+            {
+                var local = allPosts.FirstOrDefault(p => p.Id == fp.Id);
+                if (local != null) local.SpotsLeft = fp.SpotsLeft;
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[TripBuddy] Accept: " + ex.Message); }
+    }
+
+    private async Task RejectRequest(RequestViewModel req)
+    {
+        try
+        {
+            await TripBuddyService.UpdateJoinRequestAsync(req.Id, "Rejected", currentUserId);
+            req.Status = "Rejected";
+            StateHasChanged();
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[TripBuddy] Reject: " + ex.Message); }
+    }
+
+    // ── Delete post ───────────────────────────────────────────────────────────
+    private async Task DeletePost(TripPost post)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete your trip to {post.DestinationName}? This cannot be undone.");
+        if (!confirmed) return;
+
+        try
+        {
+            await TripBuddyService.DeletePostAsync(post.Id, currentUserId);
+            allPosts.Remove(post);
+            // Also remove any join requests that belonged to this post
+            allRequests.RemoveAll(r => r.PostId == post.Id);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] Delete: " + ex.Message);
+        }
+    }
+
+    // ── Chat: open for visitor (message post owner) ───────────────────────────
+    private async Task OpenChatAsVisitor(TripPost post)
+    {
+        chatTarget          = post;
+        chatDraft           = "";
+        // The visitor is always talking TO the owner.
+        // activeChatPartnerId doubles as the recipientId when the visitor sends.
+        activeChatPartnerId = post.UserId;
+        chatTabs            = new();         // no tabs for visitor
+
+        await LoadAndDisplayMessages(post.Id, currentUserId, post.UserId);
+        StartPollTimer(post.Id, post.UserId);
+    }
+
+    // ── Chat: owner opens multi-tab inbox for a specific post ─────────────────
+    private async Task OpenOwnerInbox(TripPost post)
+    {
+        chatTarget = post;
+        chatDraft  = "";
+
+        // Build one tab per accepted/pending requester for this post
+        var requesters = allRequests
+            .Where(r => r.PostId == post.Id)
+            .Select(r => new ChatTab { UserId = r.RequesterId, DisplayName = r.RequesterName })
+            .DistinctBy(t => t.UserId)
+            .ToList();
+
+        chatTabs = requesters;
+
+        if (chatTabs.Any())
+        {
+            // Default to first tab
+            activeChatPartnerId = chatTabs[0].UserId;
+            await LoadAndDisplayMessages(post.Id, currentUserId, activeChatPartnerId);
+            StartPollTimer(post.Id, activeChatPartnerId);
+        }
+        else
+        {
+            activeChatPartnerId = "";
+            chatMessages = new List<ChatMessage>
+            {
+                new ChatMessage { SenderId="system", SenderName="System",
+                    Text="No one has messaged you about this trip yet. Share your post to attract co-travelers!",
+                    SentAt=DateTime.UtcNow }
+            };
+        }
+        await ScrollToBottom();
+    }
+
+    // ── Chat: owner clicks Chat from a specific accepted request ─────────────
+    private async Task OpenChatWithRequester(RequestViewModel req)
+    {
+        var post = allPosts.FirstOrDefault(p => p.Id == req.PostId);
+        if (post == null) return;
+
+        chatTarget          = post;
+        chatDraft           = "";
+        activeChatPartnerId = req.RequesterId;
+
+        // Build tabs from all requesters for this post
+        chatTabs = allRequests
+            .Where(r => r.PostId == post.Id)
+            .Select(r => new ChatTab { UserId = r.RequesterId, DisplayName = r.RequesterName })
+            .DistinctBy(t => t.UserId)
+            .ToList();
+
+        await LoadAndDisplayMessages(post.Id, currentUserId, req.RequesterId);
+        StartPollTimer(post.Id, req.RequesterId);
+    }
+
+    // ── Chat: switch tab (owner switches between requester threads) ────────────
+    private async Task SwitchChatTab(ChatTab tab)
+    {
+        if (chatTarget == null) return;
+        activeChatPartnerId = tab.UserId;
+
+        chatPollTimer?.Dispose();
+        await LoadAndDisplayMessages(chatTarget.Id, currentUserId, tab.UserId);
+        StartPollTimer(chatTarget.Id, tab.UserId);
+    }
+
+    // ── Shared: load messages for a two-person thread and render ──────────────
+    private async Task LoadAndDisplayMessages(int postId, string userA, string userB)
+    {
+        try
+        {
+            var dbMessages = await TripBuddyService.GetMessagesAsync(postId, userA, userB);
+            chatMessages = dbMessages
+                .Select(m => new ChatMessage
+                {
+                    SenderId   = m.SenderId,
+                    SenderName = m.SenderName,
+                    Text       = m.Text,
+                    SentAt     = m.SentAt,
+                }).ToList();
+
+            if (!chatMessages.Any())
+            {
+                var partnerName = chatTabs.FirstOrDefault(t => t.UserId == userB)?.DisplayName
+                               ?? (chatTarget?.DisplayName ?? "the other traveler");
+                chatMessages.Add(new ChatMessage
+                {
+                    SenderId   = "system",
+                    SenderName = "System",
+                    Text       = $"Start your conversation with {partnerName}. Say hello! 👋",
+                    SentAt     = DateTime.UtcNow,
+                });
+            }
+
+            chatLastUpdated = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] LoadMessages: " + ex.Message);
+            chatMessages = new();
+        }
+        await ScrollToBottom();
+    }
+
+    // ── Start 5-second poll for new messages ──────────────────────────────────
+    private void StartPollTimer(int postId, string partnerId)
+    {
+        chatPollTimer?.Dispose();
+        // Capture immutable values to avoid stale closures
+        var capturedPostId    = postId;
+        var capturedPartnerId = partnerId;
+
+        chatPollTimer = new System.Threading.Timer(async _ =>
+        {
+            // Bail if user has since closed the chat
+            if (chatTarget == null || activeChatPartnerId != capturedPartnerId) return;
+
+            try
+            {
+                var fresh = await TripBuddyService.GetMessagesAsync(capturedPostId, currentUserId, capturedPartnerId);
+                var freshMapped = fresh.Select(m => new ChatMessage
+                {
+                    SenderId   = m.SenderId,
+                    SenderName = m.SenderName,
+                    Text       = m.Text,
+                    SentAt     = m.SentAt,
+                }).ToList();
+
+                var dbCount = freshMapped.Count;
+                var uiCount = chatMessages.Count(m => m.SenderId != "system");
+                var hasNew  = dbCount > uiCount;
+                if (hasNew) chatMessages = freshMapped;
+
+                await InvokeAsync(async () =>
+                {
+                    chatLastUpdated = DateTime.Now;
+                    StateHasChanged();
+                    if (hasNew) await ScrollToBottom();
+                });
+            }
+            catch { /* non-fatal polling failure */ }
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private void CloseChat()
+    {
+        chatPollTimer?.Dispose();
+        chatPollTimer       = null;
+        chatTarget          = null;
+        chatMessages        = new();
+        chatDraft           = "";
+        chatTabs            = new();
+        activeChatPartnerId = "";
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatDraft) || chatTarget == null) return;
+        var text   = chatDraft.Trim();
+        chatDraft  = "";
+
+        // Determine recipient: for a visitor this is the post owner; for the owner it's the active requester
+        var recipientId = activeChatPartnerId;
+
+        // Optimistic: show message instantly
+        chatMessages.RemoveAll(m => m.SenderId == "system"); // remove welcome placeholder once user sends
+        chatMessages.Add(new ChatMessage
+        {
+            SenderId   = currentUserId,
+            SenderName = currentUserName,
+            Text       = text,
+            SentAt     = DateTime.UtcNow,
+        });
+        chatLastUpdated = DateTime.Now;
+        StateHasChanged();
+        await ScrollToBottom();
+
+        // Persist to DB
+        try
+        {
+            await TripBuddyService.SendMessageAsync(chatTarget.Id, currentUserId, currentUserName, recipientId, text);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[TripBuddy] SendMessage: " + ex.Message);
+        }
+    }
+
+    private async Task OnChatKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey) await SendChatMessage();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : name[0].ToString().ToUpper();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try { await JS.InvokeVoidAsync("scrollToBottom", messagesContainer); }
+        catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        chatPollTimer?.Dispose();
+        requestPollTimer?.Dispose();
+        await Task.CompletedTask;
+    }
+}

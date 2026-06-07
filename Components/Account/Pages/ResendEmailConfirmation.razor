@@ -1,0 +1,173 @@
+@page "/Account/ResendEmailConfirmation"
+
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using DunesOfArabia.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Resend Confirmation – Dunes Of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    .auth-page {
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 60% 40%, #E8D9C5 0%, #DFD0B8 50%, #D4C4A8 100%);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 2rem; font-family: 'Inter','Segoe UI',sans-serif;
+    }
+    .auth-brand { text-align: center; margin-bottom: 2rem; }
+    .auth-brand h1 {
+        font-family: 'Playfair Display',Georgia,serif; font-size: 2.6rem; font-weight: 700;
+        color: #7B2D10; letter-spacing: 3px; text-transform: uppercase; margin-bottom: .4rem;
+    }
+    .auth-brand p { font-size: 1rem; color: #8B6650; }
+    .auth-card {
+        background: #FFFFFF; border-radius: 16px; padding: 3rem 3rem 2.5rem;
+        width: 100%; max-width: 520px; box-shadow: 0 4px 40px rgba(100,50,20,.10);
+    }
+    .card-icon { text-align: center; font-size: 3rem; margin-bottom: 1rem; }
+    .card-title {
+        font-family: 'Playfair Display',Georgia,serif; font-size: 1.85rem; font-weight: 600;
+        color: #1C0F07; text-align: center; margin-bottom: .75rem;
+    }
+    .card-subtitle { font-size: .9rem; color: #8B6650; text-align: center; line-height: 1.6; margin-bottom: 2rem; }
+    .success-banner {
+        background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px;
+        padding: 14px 16px; font-size: .9rem; color: #166534; font-weight: 500;
+        margin-bottom: 1.5rem; text-align: center;
+    }
+    .alert-error {
+        background-color: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5;
+        border-radius: 8px; padding: .85rem 1rem; margin-bottom: 1.5rem; font-size: .875rem; line-height: 1.5;
+    }
+    .form-group { margin-bottom: 1.6rem; }
+    .form-label { display: block; font-size: .95rem; font-weight: 600; color: #1C0F07; margin-bottom: .6rem; }
+    .input-wrapper { position: relative; display: flex; align-items: center; }
+    .input-icon { position: absolute; left: 14px; font-size: 1rem; color: #8B6650; pointer-events: none; line-height: 1; }
+    .form-input {
+        width: 100%; padding: 13px 14px 13px 42px; border: 1.5px solid #E5D8C8; border-radius: 8px;
+        font-size: .95rem; font-family: inherit; color: #1C0F07; background-color: #FDFAF7;
+        transition: border-color .25s,box-shadow .25s; appearance: none;
+    }
+    .form-input:focus { outline: none; border-color: #8B5A3C; background-color: #FFFFFF; box-shadow: 0 0 0 3px rgba(139,90,60,.12); }
+    .form-input::placeholder { color: #BBA898; font-weight: 300; }
+    .validation-error { color: #DC2626; font-size: .78rem; margin-top: .4rem; display: block; }
+    .btn-primary {
+        width: 100%; padding: 15px; background-color: #7B2D10; color: white; border: none;
+        border-radius: 8px; font-size: 1rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; letter-spacing: .5px; transition: background-color .25s,transform .2s,box-shadow .25s;
+        margin-bottom: .5rem;
+    }
+    .btn-primary:hover { background-color: #5C2009; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,45,16,.35); }
+    .btn-primary:active { transform: translateY(0); }
+    .card-footer-text {
+        text-align: center; font-size: .9rem; color: #8B6650;
+        padding-top: 1.4rem; border-top: 1px solid #F0E6D8; margin-top: 1.4rem;
+    }
+    .card-footer-text a { color: #1C0F07; font-weight: 700; text-decoration: none; }
+    .card-footer-text a:hover { color: #7B2D10; text-decoration: underline; }
+</style>
+
+<div class="auth-page">
+    <div class="auth-brand"><h1>Saudi Heritage</h1><p>Dunes of Arabia · Travel Platform</p></div>
+
+    <div class="auth-card">
+        <div class="card-icon">📨</div>
+        <h2 class="card-title">Resend Confirmation</h2>
+        <p class="card-subtitle">Enter your email address and we'll resend the account confirmation link.</p>
+
+        @if (successMessage != null)
+        {
+            <div class="success-banner">✅ @successMessage</div>
+        }
+
+        @if (errorMessage != null)
+        {
+            <div class="alert-error">⚠️ @errorMessage</div>
+        }
+
+        <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label class="form-label" for="Input.Email">Email Address</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">✉</span>
+                    <InputText @bind-Value="Input.Email"
+                               id="Input.Email"
+                               class="form-input"
+                               autocomplete="username"
+                               aria-required="true"
+                               placeholder="your.email@example.com" />
+                </div>
+                <ValidationMessage For="() => Input.Email" class="validation-error" />
+            </div>
+
+            <button type="submit" class="btn-primary">Resend Confirmation Email</button>
+        </EditForm>
+
+        <div class="card-footer-text">
+            Already confirmed? <a href="/Account/Login">Sign In</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? successMessage;
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    protected override void OnInitialized() { Input ??= new(); }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var user = await UserManager.FindByEmailAsync(Input.Email!);
+
+        // Always show success to avoid revealing whether the email is registered.
+        if (user is null)
+        {
+            successMessage = "If that email is registered, a confirmation link has been sent.";
+            return;
+        }
+
+        try
+        {
+            var userId = await UserManager.GetUserIdAsync(user);
+            var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+            var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+                NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+                new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+
+            await EmailSender.SendConfirmationLinkAsync(user, Input.Email, callbackUrl);
+
+            successMessage = "Confirmation email sent! Please check your inbox.";
+        }
+        catch (Exception ex)
+        {
+            // Show the real Resend error — most likely test-mode restriction.
+            // Fix: verify a domain at resend.com/domains and update your 'from' address.
+            errorMessage = $"Could not send email: {ex.Message}";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email format")]
+        public string Email { get; set; } = "";
+    }
+}

@@ -1,0 +1,833 @@
+@page "/checkout"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@inject IBookingService BookingService
+@inject IDocumentUploadService DocumentUploadService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@inject HttpClient Http
+@inject UserManager<DunesOfArabia.Models.ApplicationUser> UserManager
+
+@using System.Security.Claims
+@using System.Net.Http.Json
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Identity
+
+<PageTitle>Checkout – Dunes of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+    .checkout-page { background: #F5EFE8; min-height: 100vh; padding: 2rem 1rem 4rem; font-family: 'Lato', sans-serif; }
+    .checkout-container { max-width: 1200px; margin: 0 auto; }
+    .checkout-container h1 { font-family: 'Playfair Display', Georgia, serif; color: #7B3121; text-align: center; margin-bottom: 0.4rem; font-size: clamp(1.6rem, 3.5vw, 2.2rem); }
+    .checkout-subtitle { text-align: center; color: #9A8878; font-size: 0.86rem; margin-bottom: 2rem; font-weight: 300; }
+    .breadcrumb { display: flex; align-items: center; gap: 0.5rem; max-width: 1200px; margin: 0 auto 1.5rem; font-size: 0.82rem; color: #9A8878; flex-wrap: wrap; }
+    .breadcrumb a { color: #7B3121; text-decoration: none; font-weight: 600; }
+    .breadcrumb-sep { color: #C4A090; }
+    .flow-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 2rem; flex-wrap: wrap; }
+    .flow-step { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: #B0A090; font-weight: 500; }
+    .flow-step.done { color: #7B3121; font-weight: 600; }
+    .flow-step.current { color: #C8873A; font-weight: 700; }
+    .flow-step-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.done .flow-step-dot { background: #7B3121; color: white; border-color: #7B3121; }
+    .flow-step.current .flow-step-dot { background: #C8873A; color: white; border-color: #C8873A; }
+    .flow-connector { width: 32px; height: 2px; background: #DDD3C8; margin: 0 0.25rem; }
+    .flow-connector.done { background: #7B3121; }
+    .trust-bar { display: flex; align-items: center; justify-content: center; gap: 2rem; background: white; border-radius: 10px; padding: 0.85rem 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; box-shadow: 0 1px 6px rgba(0,0,0,0.05); }
+    .trust-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #7A6658; font-weight: 500; }
+    .profile-gate-banner { background: white; border-radius: 12px; padding: 1.5rem 2rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 5px solid #C8873A; }
+    .gate-banner-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: #1C1008; font-weight: 700; margin-bottom: 0.4rem; }
+    .gate-banner-body { font-size: 0.87rem; color: #7A6658; line-height: 1.6; margin-bottom: 1rem; }
+    .gate-checks { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .gate-check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; padding: 5px 12px; border-radius: 20px; background: #FFF8DC; color: #7A5A00; font-weight: 500; }
+    .gate-check.ok { background: #E8F5E9; color: #2E7D32; }
+    .gate-actions-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .btn-go-profile { background: #7B3121; color: white; border: none; padding: 10px 22px; border-radius: 7px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+    .btn-go-docs { background: #C8873A; color: white; border: none; padding: 10px 22px; border-radius: 7px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+    .checkout-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2rem; align-items: start; }
+    .checkout-column { display: flex; flex-direction: column; gap: 1.5rem; }
+    .checkout-section { background: white; padding: 1.75rem 2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .checkout-section h2 { color: #7B3121; margin-top: 0; margin-bottom: 1.4rem; font-size: 1.15rem; border-bottom: 2px solid #7B3121; padding-bottom: 0.6rem; font-family: 'Playfair Display', Georgia, serif; }
+    .order-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 1rem; background: #F5EFE8; border-radius: 8px; margin-bottom: 0.75rem; gap: 1rem; }
+    .item-icon { width: 36px; height: 36px; border-radius: 8px; background: #7B3121; color: white; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+    .item-details { flex: 1; } .item-details h4 { margin: 0 0 0.2rem; color: #1C1008; font-size: 0.94rem; font-weight: 700; } .item-details p { margin: 0.15rem 0; color: #7A6658; font-size: 0.82rem; }
+    .item-price { text-align: right; font-weight: 700; color: #1C1008; font-size: 0.95rem; white-space: nowrap; }
+    .promo-section { display: flex; gap: 0.5rem; margin: 1.2rem 0 0.4rem; }
+    .promo-input { flex: 1; padding: 0.7rem 1rem; border: 1.5px solid #DDD3C8; border-radius: 6px; font-family: inherit; font-size: 0.88rem; outline: none; transition: border-color 0.2s; }
+    .promo-input:focus { border-color: #7B3121; }
+    .promo-msg { font-size: 0.82rem; margin: 0 0 0.8rem; }
+    .promo-ok { color: #2E7D32; } .promo-err { color: #B71C1C; }
+    .btn-apply { padding: 0.7rem 1.25rem; background: #7B3121; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: inherit; white-space: nowrap; transition: background 0.2s; }
+    .btn-apply:hover { background: #5C2218; }
+    .price-breakdown { border: 2px solid #7B3121; border-radius: 8px; padding: 1rem 1.2rem; background: #FFF8EE; margin-top: 0.5rem; }
+    .price-row { display: flex; justify-content: space-between; padding: 0.38rem 0; color: #666; font-size: 0.9rem; border-bottom: 1px solid #F0E8DC; }
+    .price-row:last-child { border-bottom: none; }
+    .price-row.discount { color: #2E7D32; }
+    .price-row.total { border-top: 2px solid #7B3121; padding-top: 0.75rem; margin-top: 0.5rem; font-size: 1.08rem; color: #7B3121; font-weight: 700; border-bottom: none; }
+    .payment-options { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.2rem; }
+    .payment-option { display: flex; align-items: center; padding: 0.9rem 1rem; border: 1.5px solid #DDD3C8; border-radius: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; gap: 0.75rem; font-weight: 500; font-size: 0.9rem; }
+    .payment-option.selected, .payment-option:hover { border-color: #7B3121; background: #F5EFE8; }
+    .payment-option input { accent-color: #7B3121; }
+    .payment-logo { width: 32px; height: 20px; background: #EEE; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #555; flex-shrink: 0; }
+    .tabby-info { background: #E8F4FF; border: 1.5px solid #90CAF9; border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.84rem; color: #1A3A5C; margin-bottom: 0.5rem; }
+    .form-group { margin-bottom: 1.1rem; }
+    .form-group label { display: block; margin-bottom: 0.38rem; font-weight: 600; color: #3A2A1E; font-size: 0.86rem; }
+    .form-input, .form-textarea, .form-select { width: 100%; padding: 0.72rem 0.9rem; border: 1.5px solid #DDD3C8; border-radius: 7px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; background: white; color: #1C1008; outline: none; }
+    .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.08); }
+    .form-input:disabled { background: #F0EBE5; color: #888; cursor: not-allowed; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .checkbox { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 0.88rem; color: #444; line-height: 1.5; margin-bottom: 0.85rem; }
+    .checkbox input { margin-top: 0.2rem; accent-color: #7B3121; flex-shrink: 0; }
+    .checkout-actions { display: flex; gap: 0.75rem; }
+    .btn-back { padding: 0.85rem 1.5rem; border: 1.5px solid #C4A090; border-radius: 8px; background: white; color: #5A3A2A; font-size: 0.9rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.18s; white-space: nowrap; }
+    .btn-back:hover { background: #FAF0E8; border-color: #7B3121; }
+    .btn-pay { flex: 1; padding: 0.9rem 1.5rem; background: #7B3121; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-family: inherit; font-size: 0.98rem; transition: background 0.2s, transform 0.15s; text-align: center; }
+    .btn-pay:hover:not(:disabled) { background: #5C2218; transform: translateY(-1px); }
+    .btn-pay:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .error-message { background: #FFF0EE; border: 1.5px solid #E8A090; color: #7B2010; padding: 0.85rem 1rem; border-radius: 8px; font-size: 0.88rem; }
+    .security-badges { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #F0E8DC; }
+    .sec-badge { display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #9A8878; font-weight: 500; }
+    .loading-state, .empty-checkout { background: white; padding: 3rem 2rem; border-radius: 12px; text-align: center; color: #666; }
+    .empty-checkout a { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.75rem; background: #7B3121; color: white; border-radius: 7px; text-decoration: none; font-weight: 600; }
+    /* ── STRIPE CARD ELEMENT ── */
+    .stripe-card-wrapper { margin-top: 0.75rem; }
+    .stripe-card-label { display: block; margin-bottom: 0.38rem; font-weight: 600; color: #3A2A1E; font-size: 0.86rem; }
+    .stripe-element-container { padding: 0.72rem 0.9rem; border: 1.5px solid #DDD3C8; border-radius: 7px; background: white; transition: border-color 0.2s, box-shadow 0.2s; min-height: 44px; }
+    .stripe-element-container.StripeElement--focus { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.08); }
+    .stripe-element-container.StripeElement--invalid { border-color: #E53935; }
+    .stripe-card-error { color: #B71C1C; font-size: 0.82rem; margin-top: 0.4rem; }
+    .stripe-test-notice { background: #FFF8DC; border: 1.5px solid #C8873A; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.8rem; color: #5C3D00; margin-top: 0.75rem; line-height: 1.6; }
+    @@media (max-width: 968px) { .checkout-grid { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } .checkout-actions { flex-direction: column; } }
+</style>
+
+<script>
+        // ── Stripe interop ───────────────────────────────────────────────────
+        // stripe.js is loaded in App.razor <head>. We await window._stripeReady
+        // (set there) so Stripe() is guaranteed defined before we call it.
+        window.stripeInterop = {
+            _stripe: null,
+            _card:   null,
+
+            init: async function (publishableKey) {
+                // Wait for stripe.js to finish loading (Promise set in App.razor)
+                if (window._stripeReady) await window._stripeReady;
+
+                // Already fully initialised?
+                if (this._stripe && this._card) return true;
+
+                // DOM element must exist before mounting
+                var el = document.getElementById('stripe-card-element');
+                if (!el) return false; // caller will retry
+
+                this._stripe = Stripe(publishableKey);
+                var elements = this._stripe.elements();
+                this._card   = elements.create('card', {
+                    style: {
+                        base: {
+                            fontFamily: "'Lato', sans-serif",
+                            fontSize:   '15px',
+                            color:      '#1C1008',
+                            '::placeholder': { color: '#B0A090' }
+                        },
+                        invalid: { color: '#E53935' }
+                    }
+                });
+                this._card.mount('#stripe-card-element');
+                return true;
+            },
+
+            confirmPayment: async function (clientSecret) {
+                var result = await this._stripe.confirmCardPayment(clientSecret, {
+                    payment_method: { card: this._card }
+                });
+                if (result.error) return { success: false, error: result.error.message };
+                return { success: true, paymentIntentId: result.paymentIntent.id };
+            },
+
+            destroy: function () {
+                if (this._card) { this._card.unmount(); this._card = null; }
+                this._stripe = null;
+            }
+        };
+</script>
+
+<div class="checkout-page">
+    <div class="checkout-container">
+
+        <div class="breadcrumb">
+            <a href="/destinations">Destinations</a>
+            <span class="breadcrumb-sep">›</span>
+            @if (cartItems != null && cartItems.Any() && !string.IsNullOrEmpty(cartItems[0].DestinationName))
+            {
+                <a href="/destination/@cartItems[0].DestinationId">@cartItems[0].DestinationName</a>
+                <span class="breadcrumb-sep">›</span>
+                <a href="/planner?destinationId=@cartItems[0].DestinationId">Trip Planner</a>
+                <span class="breadcrumb-sep">›</span>
+            }
+            <span>Checkout</span>
+        </div>
+
+        <h1>Complete Your Booking</h1>
+        <p class="checkout-subtitle">Review and confirm your Saudi Arabia trip plan</p>
+
+        <div class="flow-steps">
+            <div class="flow-step done"><div class="flow-step-dot">✓</div><span>Choose Plan</span></div>
+            <div class="flow-connector done"></div>
+            <div class="flow-step done"><div class="flow-step-dot">✓</div><span>Customize</span></div>
+            <div class="flow-connector done"></div>
+            <div class="flow-step done"><div class="flow-step-dot">✓</div><span>Transport</span></div>
+            <div class="flow-connector done"></div>
+            <div class="flow-step current"><div class="flow-step-dot">4</div><span>Checkout</span></div>
+        </div>
+
+        <div class="trust-bar">
+            <div class="trust-item">🔒 Secure Checkout</div>
+            <div class="trust-item">✅ Instant Confirmation</div>
+            <div class="trust-item">📧 Email Receipt</div>
+            <div class="trust-item">🔄 Free Cancellation (24hr)</div>
+        </div>
+
+        @if (!isProfileComplete && !isLoadingProfile)
+        {
+            <div class="profile-gate-banner">
+                <div class="gate-banner-title">⚠️ Complete Your Profile to Book</div>
+                <div class="gate-banner-body">
+                    For your safety and compliance with Saudi tourism regulations, we require verified identity documents
+                    before you can complete a booking. This is a one-time process — once complete, you can book instantly.
+                </div>
+                <div class="gate-checks">
+                    <div class="gate-check @(hasName ? "ok" : "")">@(hasName ? "✓" : "○") Full Name</div>
+                    <div class="gate-check @(hasPhone ? "ok" : "")">@(hasPhone ? "✓" : "○") Phone</div>
+                    <div class="gate-check @(hasNationality ? "ok" : "")">@(hasNationality ? "✓" : "○") Nationality</div>
+                    <div class="gate-check @(hasPassport ? "ok" : "")">@(hasPassport ? "✓" : "○") Passport</div>
+                    <div class="gate-check @(hasNationalId ? "ok" : "")">@(hasNationalId ? "✓" : "○") National ID</div>
+                    <div class="gate-check @(hasSelfie ? "ok" : "")">@(hasSelfie ? "✓" : "○") Selfie</div>
+                </div>
+                <div class="gate-actions-row">
+                    <button class="btn-go-profile" @onclick='() => Nav.NavigateTo("/settings")'>✏️ Update Profile Info</button>
+                    <a class="btn-go-docs" href="/profile?tab=documents&returnUrl=/checkout@GetQuerySuffix()">📎 Upload Documents →</a>
+                </div>
+            </div>
+        }
+
+        @if (cartItems == null)
+        {
+            <div class="loading-state"><div style="font-size:1.5rem;margin-bottom:0.75rem;">⏳</div><p>Loading your booking details...</p></div>
+        }
+        else if (!cartItems.Any())
+        {
+            <div class="empty-checkout">
+                <div style="font-size:2.5rem;margin-bottom:0.75rem;">🛒</div>
+                <p style="font-size:1.05rem;color:#3A2A1E;font-weight:600;">Your cart is empty</p>
+                <p style="font-size:0.88rem;color:#9A8878;">Browse destinations and use the Trip Planner before checkout.</p>
+                <a href="/destinations">Browse Destinations →</a>
+            </div>
+        }
+        else
+        {
+            <div class="checkout-grid">
+
+                <!-- LEFT: Order Summary + Payment -->
+                <div class="checkout-column">
+
+                    <section class="checkout-section">
+                        <h2>📋 Order Summary</h2>
+                        @foreach (var item in cartItems)
+                        {
+                            <div class="order-item">
+                                <div class="item-icon">@item.Icon</div>
+                                <div class="item-details">
+                                    <h4>@item.ItemName</h4>
+                                    @if (!string.IsNullOrEmpty(item.Detail1)) { <p>@item.Detail1</p> }
+                                    @if (!string.IsNullOrEmpty(item.Detail2)) { <p>@item.Detail2</p> }
+                                    @if (item.Quantity > 0) { <p>@item.Quantity @(item.Quantity == 1 ? "person" : "people")</p> }
+                                </div>
+                                <div class="item-price">
+                                    @if (item.Price > 0) { <span>SR @(item.Price.ToString("N0"))</span> }
+                                    else { <span style="color:#2E7D32;font-size:0.82rem;">Included</span> }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="promo-section">
+                            <input type="text" @bind="promoCode" placeholder="Enter promo code (try DUNES10)" class="promo-input" />
+                            <button @onclick="ApplyPromoCode" class="btn-apply">Apply</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(promoMessage))
+                        {
+                            <p class="promo-msg @(discountAmount > 0 ? "promo-ok" : "promo-err")">@promoMessage</p>
+                        }
+
+                        <div class="price-breakdown">
+                            <div class="price-row"><span>Plan + Activities</span><span>SR @subtotal.ToString("N2")</span></div>
+                            @if (transportCost > 0)
+                            {
+                                <div class="price-row"><span>Transport (@transportLabel)</span><span>SR @transportCost.ToString("N2")</span></div>
+                            }
+                            <div class="price-row"><span>VAT (15%)</span><span>SR @tax.ToString("N2")</span></div>
+                            @if (discountAmount > 0)
+                            {
+                                <div class="price-row discount"><span>Discount applied</span><span>−SR @discountAmount.ToString("N2")</span></div>
+                            }
+                            <div class="price-row total"><span>Total</span><strong>SR @totalPrice.ToString("N2")</strong></div>
+                        </div>
+                    </section>
+
+                    <section class="checkout-section">
+                        <h2>💳 Payment Method</h2>
+                        <div class="payment-options">
+                            <label class="payment-option @(paymentMethod == "card" ? "selected" : "")">
+                                <input type="radio" name="payment" value="card"
+                                       @onchange='async () => { paymentMethod = "card"; await InitStripeAsync(); }' checked />
+                                <div class="payment-logo">VISA</div>
+                                <span>Credit / Debit Card</span>
+                            </label>
+                            <label class="payment-option @(paymentMethod == "tabby" ? "selected" : "")">
+                                <input type="radio" name="payment" value="tabby"
+                                       @onchange='async () => { paymentMethod = "tabby"; await JS.InvokeVoidAsync("stripeInterop.destroy"); }' />
+                                <div class="payment-logo" style="background:#3D1CBA;color:white;">TB</div>
+                                <span>Tabby — Pay in 4 (0% interest)</span>
+                            </label>
+                            <label class="payment-option @(paymentMethod == "apple" ? "selected" : "")">
+                                <input type="radio" name="payment" value="apple"
+                                       @onchange='async () => { paymentMethod = "apple"; await JS.InvokeVoidAsync("stripeInterop.destroy"); }' />
+                                <div class="payment-logo" style="background:#000;color:white;">🍎</div>
+                                <span>Apple Pay</span>
+                            </label>
+                            <label class="payment-option @(paymentMethod == "mada" ? "selected" : "")">
+                                <input type="radio" name="payment" value="mada"
+                                       @onchange='async () => { paymentMethod = "mada"; await InitStripeAsync(); }' />
+                                <div class="payment-logo" style="background:#009A44;color:white;">مدى</div>
+                                <span>mada (Saudi debit)</span>
+                            </label>
+                        </div>
+
+                        @if (paymentMethod == "card" || paymentMethod == "mada")
+                        {
+                            <div class="stripe-card-wrapper">
+                                <label class="stripe-card-label">Card Details</label>
+                                <div id="stripe-card-element" class="stripe-element-container"></div>
+                                @if (!string.IsNullOrEmpty(stripeCardError))
+                                {
+                                    <div class="stripe-card-error">@stripeCardError</div>
+                                }
+                                <div class="stripe-test-notice">
+                                    🧪 <strong>Test Mode:</strong> Use card <code>4242 4242 4242 4242</code>, any future date, any CVC. No real charge.
+                                </div>
+                            </div>
+                        }
+                        @if (paymentMethod == "tabby")
+                        {
+                            <div class="tabby-info">
+                                💙 <strong>Tabby Split:</strong> Pay SR @((totalPrice / 4).ToString("N2")) today, then 3 more payments every 4 weeks. Zero interest.
+                            </div>
+                        }
+                    </section>
+                </div>
+
+                <!-- RIGHT: Traveler Info + Confirm -->
+                <div class="checkout-column">
+
+                    <section class="checkout-section">
+                        <h2>👤 Your Information</h2>
+                        <div class="form-row">
+                            <div class="form-group"><label>First Name *</label><input type="text" @bind="firstName" placeholder="First name" class="form-input" /></div>
+                            <div class="form-group"><label>Last Name *</label><input type="text" @bind="lastName" placeholder="Last name" class="form-input" /></div>
+                        </div>
+                        <div class="form-group"><label>Email *</label><input type="email" @bind="email" placeholder="your@email.com" class="form-input" /></div>
+                        <div class="form-group"><label>Phone Number *</label><input type="tel" @bind="phone" placeholder="+966 5XX XXX XXXX" class="form-input" /></div>
+                        <div class="form-group"><label>Nationality *</label><input type="text" @bind="nationality" placeholder="e.g. Saudi, Pakistani..." class="form-input" /></div>
+                        <div class="form-group"><label>Special Requirements</label><textarea @bind="specialRequirements" placeholder="Dietary restrictions, accessibility needs, etc." class="form-textarea"></textarea></div>
+                    </section>
+
+                    <section class="checkout-section">
+                        <h2>✅ Confirm Booking</h2>
+
+                        <label class="checkbox">
+                            <input type="checkbox" @bind="agreedToTerms" />
+                            <span>I agree to the <a href="/terms" style="color:#7B3121;font-weight:600;">Terms &amp; Conditions</a>, <a href="/privacy" style="color:#7B3121;font-weight:600;">Privacy Policy</a>, and Cancellation Policy.</span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" @bind="confirmAccurate" />
+                            <span>I confirm all traveler details above are accurate.</span>
+                        </label>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="error-message" style="margin-top:1rem;">⚠️ @errorMessage</div>
+                        }
+
+                        <div class="checkout-actions" style="margin-top:1.5rem;">
+                            <button class="btn-back" @onclick="GoBack">← Back to Planner</button>
+                            <button class="btn-pay"
+                                    @onclick="HandleCheckout"
+                                    disabled="@(isProcessing || !agreedToTerms || !confirmAccurate || !isProfileComplete)">
+                                @if (isProcessing) { <span>⏳ Processing...</span> }
+                                else if (!isProfileComplete) { <span>🔒 Complete Profile First</span> }
+                                else { <span>🎫 Confirm Booking • SR @totalPrice.ToString("N2")</span> }
+                            </button>
+                        </div>
+
+                        @if (!isProfileComplete)
+                        {
+                            <p style="font-size:0.8rem;color:#C8873A;text-align:center;margin-top:0.5rem;">
+                                ⚠️ Your profile is @profileCompletionPct% complete. <a href="/profile" style="color:#7B3121;font-weight:600;">Finish setup</a> to unlock booking.
+                            </p>
+                        }
+
+                        <div class="security-badges">
+                            <div class="sec-badge">🔒 SSL Encrypted</div>
+                            <div class="sec-badge">🛡️ PCI Compliant</div>
+                            <div class="sec-badge">✅ Verified Booking</div>
+                            <div class="sec-badge">📋 ID Verified</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    // ── Stripe publishable key ────────────────────────────────────────────────
+    private const string StripePublishableKey =
+        "pk_test_51Td6SW2YVrgW2nX9RvqljGvN6xuq9HXZddfn6PcMuYSuyDSiFT86IFAlibQunLDaIpUJO69OHWZPfm4s8ynDGAqn00fXtDn23s";
+
+    private List<CartItem>? cartItems;
+
+    // Profile gate state
+    private bool isLoadingProfile  = true;
+    private bool isProfileComplete = false;
+    private bool hasName           = false;
+    private bool hasPhone          = false;
+    private bool hasNationality    = false;
+    private bool hasPassport       = false;
+    private bool hasNationalId     = false;
+    private bool hasSelfie         = false;
+    private int  profileCompletionPct = 0;
+
+    private string  promoCode      = "";
+    private string  promoMessage   = "";
+    private decimal subtotal       = 0;
+    private decimal tax            = 0;
+    private decimal totalPrice     = 0;
+    private decimal discountAmount = 0;
+    private decimal transportCost  = 0;
+    private string  transportLabel = "";
+
+    private string firstName           = "";
+    private string lastName            = "";
+    private string email               = "";
+    private string phone               = "";
+    private string nationality         = "";
+    private string specialRequirements = "";
+
+    private string    paymentMethod   = "card";
+    private bool      agreedToTerms   = false;
+    private bool      confirmAccurate = false;
+    private bool      isProcessing    = false;
+    private string    errorMessage    = "";
+    private string    stripeCardError = "";
+    private string    userId          = "";
+    private DateTime? checkoutStartDate = null;
+    private DateTime? checkoutEndDate   = null;
+    private bool      stripeInitialised = false;
+
+    // ── Initialise Stripe card element after first render ────────────────────
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (paymentMethod == "card" || paymentMethod == "mada"))
+        {
+            // Small delay so Blazor finishes painting the #stripe-card-element div
+            await Task.Delay(50);
+            await InitStripeAsync();
+        }
+    }
+
+    private async Task InitStripeAsync()
+    {
+        try
+        {
+            stripeCardError = "";
+            // Ensure the conditional wrapper has been rendered before mounting
+            StateHasChanged();
+            await Task.Yield();
+            // Retry a few times in case the DOM element isn't painted yet
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                var mounted = await JS.InvokeAsync<bool>("stripeInterop.init", StripePublishableKey);
+                if (mounted) { stripeInitialised = true; break; }
+                await Task.Delay(80);
+            }
+        }
+        catch (Exception ex)
+        {
+            stripeCardError = $"Could not load card element: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState       = await AuthStateProvider.GetAuthenticationStateAsync();
+            var isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+            if (!isAuthenticated)
+            {
+                Nav.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString("/checkout" + GetQuerySuffix())}");
+                return;
+            }
+
+            userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            email  = authState.User.FindFirstValue(ClaimTypes.Email) ?? "";
+
+            // ── Load user record + claims fresh from the database ─────────
+            // Claims in the auth principal may be stale until the user
+            // logs out and back in. Reading directly from UserManager ensures
+            // data saved on Settings.razor is picked up immediately.
+            var appUser = await UserManager.FindByIdAsync(userId);
+            if (appUser != null)
+            {
+                var dbClaims = await UserManager.GetClaimsAsync(appUser);
+                var claimDict = dbClaims
+                    .GroupBy(c => c.Type)
+                    .ToDictionary(g => g.Key, g => g.Last().Value);
+
+                // Name: prefer explicit first_name/last_name claims, fall back to FullName
+                firstName = claimDict.GetValueOrDefault("first_name", "");
+                lastName  = claimDict.GetValueOrDefault("last_name",  "");
+                if (string.IsNullOrWhiteSpace(firstName) && !string.IsNullOrWhiteSpace(appUser.FullName))
+                {
+                    var parts = appUser.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    firstName = parts.Length > 0 ? parts[0] : appUser.FullName;
+                    lastName  = parts.Length > 1 ? parts[1] : "";
+                }
+
+                // Phone: authoritative value is PhoneNumber column set via SetPhoneNumberAsync
+                phone = appUser.PhoneNumber ?? claimDict.GetValueOrDefault("phone_number", "");
+
+                // Nationality: stored as a claim by Settings.razor
+                nationality = claimDict.GetValueOrDefault("nationality", "");
+
+                hasName        = !string.IsNullOrWhiteSpace(firstName);
+                hasPhone       = !string.IsNullOrWhiteSpace(phone);
+                hasNationality = !string.IsNullOrWhiteSpace(nationality);
+            }
+            else
+            {
+                // Fallback: try the (potentially stale) auth principal
+                var user = authState.User;
+                hasName        = !string.IsNullOrWhiteSpace(user.Identity?.Name) && user.Identity?.Name != "Traveler";
+                hasPhone       = !string.IsNullOrWhiteSpace(user.FindFirst("phone_number")?.Value ?? user.FindFirst(ClaimTypes.MobilePhone)?.Value);
+                hasNationality = !string.IsNullOrWhiteSpace(user.FindFirst("nationality")?.Value);
+                var nameParts  = (user.Identity?.Name ?? "").Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                firstName   = nameParts.Length > 0 ? nameParts[0] : "";
+                lastName    = nameParts.Length > 1 ? nameParts[1] : "";
+                phone       = user.FindFirst("phone_number")?.Value ?? user.FindFirst(ClaimTypes.MobilePhone)?.Value ?? "";
+                nationality = user.FindFirst("nationality")?.Value ?? "";
+            }
+
+            try
+            {
+                var docs = await DocumentUploadService.GetUserDocumentsAsync(userId);
+                if (docs != null)
+                {
+                    hasPassport   = docs.Any(d => d.Category == "Passport");
+                    hasNationalId = docs.Any(d => d.Category == "National ID");
+                    hasSelfie     = docs.Any(d => d.Category == "Selfie");
+                }
+            }
+            catch { /* non-fatal */ }
+
+            var completed = (hasName ? 1 : 0) + (hasPhone ? 1 : 0) + (hasNationality ? 1 : 0) +
+                            (hasPassport ? 1 : 0) + (hasNationalId ? 1 : 0) + (hasSelfie ? 1 : 0);
+            profileCompletionPct = (completed * 100) / 6;
+            isProfileComplete    = completed == 6;
+
+            LoadCartFromQueryString();
+            CalculatePrices();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading checkout: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingProfile = false;
+        }
+    }
+
+    private void LoadCartFromQueryString()
+    {
+        var uri   = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        cartItems = new List<CartItem>();
+
+        query.TryGetValue("destinationId",   out var destId);
+        query.TryGetValue("destinationName", out var destName);
+        query.TryGetValue("planName",        out var planName);
+        query.TryGetValue("planPrice",       out var planPriceStr);
+        query.TryGetValue("travelers",       out var travelersStr);
+        query.TryGetValue("transport",       out var transport);
+        query.TryGetValue("transportCost",   out var transportCostStr);
+        query.TryGetValue("startDate",       out var startDateStr);
+        query.TryGetValue("endDate",         out var endDateStr);
+        query.TryGetValue("activities",      out var activitiesStr);
+        query.TryGetValue("activityTotal",   out var actTotalStr);
+
+        decimal.TryParse(planPriceStr,     out var planPrice);
+        decimal.TryParse(actTotalStr,      out var actTotal);
+        int.TryParse(travelersStr,         out var travelers);
+        decimal.TryParse(transportCostStr, out var tCost);
+        DateTime.TryParse(startDateStr,    out var startDate);
+        DateTime.TryParse(endDateStr,      out var endDate);
+
+        checkoutStartDate = startDate != default ? startDate : (DateTime?)null;
+        checkoutEndDate   = endDate   != default ? endDate   : (DateTime?)null;
+        int.TryParse(destId, out var destinationId);
+
+        if (travelers < 1) travelers = 1;
+        var dName = destName.ToString() is { Length: > 0 } n ? n : "Saudi Arabia";
+        var pName = planName.ToString() is { Length: > 0 } p ? p : "Trip Plan";
+
+        if (planPrice > 0 || destinationId > 0)
+        {
+            cartItems.Add(new CartItem
+            {
+                Icon            = "🗺️",
+                ItemName        = pName,
+                Detail1         = $"📍 {dName}",
+                Detail2         = checkoutStartDate.HasValue && checkoutEndDate.HasValue
+                                    ? $"📅 {checkoutStartDate.Value:MMM d} – {checkoutEndDate.Value:MMM d, yyyy}"
+                                    : "",
+                Quantity        = travelers,
+                Price           = planPrice * travelers,
+                DestinationId   = destinationId,
+                DestinationName = dName,
+            });
+        }
+
+        if (activitiesStr.ToString() is { Length: > 0 } actStr)
+        {
+            var actIds = actStr.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            if (actIds.Length > 0)
+            {
+                cartItems.Add(new CartItem
+                {
+                    Icon     = "🎯",
+                    ItemName = $"{actIds.Length} Selected {(actIds.Length == 1 ? "Activity" : "Activities")}",
+                    Detail1  = $"from {dName}",
+                    Quantity = travelers,
+                    Price    = actTotal > 0 ? actTotal * travelers : actIds.Length * 150m * travelers,
+                    DestinationId   = destinationId,
+                    DestinationName = dName,
+                });
+            }
+        }
+
+        if (tCost > 0 && transport.ToString() is { Length: > 0 } t && t != "none")
+        {
+            transportLabel = t switch
+            {
+                "saptco" => "SAPTCO Bus",
+                "careem" => "Careem / Private Car",
+                "flight" => "Domestic Flight",
+                "train"  => "SAR Train (Haramain)",
+                _        => t
+            };
+            transportCost = tCost;
+            cartItems.Add(new CartItem
+            {
+                Icon     = t == "flight" ? "✈️" : t == "train" ? "🚆" : t == "careem" ? "🚗" : "🚌",
+                ItemName = $"Transport: {transportLabel}",
+                Detail1  = $"For {travelers} {(travelers == 1 ? "person" : "people")}",
+                Quantity = 0,
+                Price    = tCost,
+                DestinationId   = destinationId,
+                DestinationName = dName,
+            });
+        }
+    }
+
+    private string GetQuerySuffix()
+    {
+        var uri = new Uri(Nav.Uri);
+        return uri.Query;
+    }
+
+    private void CalculatePrices()
+    {
+        subtotal   = cartItems?.Sum(x => x.Price) ?? 0;
+        tax        = subtotal * 0.15m;
+        totalPrice = subtotal + tax - discountAmount;
+    }
+
+    private void ApplyPromoCode()
+    {
+        promoMessage = "";
+        if (string.IsNullOrWhiteSpace(promoCode)) { promoMessage = "Enter a promo code."; return; }
+        switch (promoCode.Trim().ToUpperInvariant())
+        {
+            case "DUNES10":  discountAmount = subtotal * 0.10m; promoMessage = "✅ 10% discount applied!";          break;
+            case "SAUDI50":  discountAmount = 50m;              promoMessage = "✅ SR 50 discount applied!";        break;
+            case "HERITAGE": discountAmount = subtotal * 0.15m; promoMessage = "✅ 15% Heritage discount applied!"; break;
+            default:         discountAmount = 0;                promoMessage = "❌ Invalid promo code. Try DUNES10."; break;
+        }
+        CalculatePrices();
+    }
+
+    private async Task HandleCheckout()
+    {
+        errorMessage    = "";
+        stripeCardError = "";
+
+        if (!isProfileComplete)
+        { errorMessage = "Please complete your profile and upload required documents before booking."; return; }
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        { errorMessage = "Please enter your first and last name."; return; }
+        if (string.IsNullOrWhiteSpace(email))
+        { errorMessage = "Please enter your email address."; return; }
+        if (string.IsNullOrWhiteSpace(phone))
+        { errorMessage = "Please enter your phone number."; return; }
+        if (!agreedToTerms)
+        { errorMessage = "Please agree to the Terms & Conditions."; return; }
+        if (!confirmAccurate)
+        { errorMessage = "Please confirm your details are accurate."; return; }
+        if (checkoutStartDate == null || checkoutStartDate.Value.Date < DateTime.Today)
+        { errorMessage = "Please go back and select valid travel dates."; return; }
+
+        isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            string paymentIntentId;
+
+            if (paymentMethod == "card" || paymentMethod == "mada")
+            {
+                // ── Step 1: Ask our backend to create a PaymentIntent ─────────
+                // Use NavigationManager.BaseUri to build the absolute URL — this
+                // guarantees the correct host:port in all environments (dev / prod)
+                // regardless of what HttpClient.BaseAddress was set to at startup.
+                var intentUrl = new Uri(new Uri(Nav.BaseUri), "/api/payments/create-intent").ToString();
+                var intentResponse = await Http.PostAsJsonAsync(intentUrl, new
+                {
+                    amountSar     = (long)(totalPrice * 100), // halalas (SAR × 100)
+                    currency      = "sar",
+                    description   = $"Dunes of Arabia – {firstName} {lastName}",
+                    customerEmail = email
+                });
+
+                // Read body once — we need it for both error reporting and JSON parse
+                var responseBody = await intentResponse.Content.ReadAsStringAsync();
+                var contentType  = intentResponse.Content.Headers.ContentType?.MediaType ?? "";
+
+                if (!intentResponse.IsSuccessStatusCode)
+                {
+                    // Strip HTML tags from error pages to give a readable message
+                    var plainError = System.Text.RegularExpressions.Regex.IsMatch(responseBody, "<html", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                        ? $"HTTP {(int)intentResponse.StatusCode} — the payment endpoint returned an error page. " +
+                          "Check that PaymentsController is registered and the route /api/payments/create-intent exists."
+                        : $"Payment server error ({(int)intentResponse.StatusCode}): {responseBody}";
+                    throw new Exception(plainError);
+                }
+
+                // Guard: if the server returned HTML (e.g. Blazor fallback / redirect)
+                // even with a 200 status, surface a clear message instead of a JSON parse crash.
+                if (!contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new Exception(
+                        $"The payment endpoint returned '{contentType}' instead of JSON. " +
+                        "Ensure MapControllers() is called before MapRazorComponents() in Program.cs " +
+                        "and that [ApiController] / [Route(\"api/[controller]\")] are on PaymentsController.");
+                }
+
+                StripeIntentResult? intentData;
+                try
+                {
+                    intentData = System.Text.Json.JsonSerializer.Deserialize<StripeIntentResult>(
+                        responseBody,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+                catch (Exception jsonEx)
+                {
+                    throw new Exception($"Could not parse payment response: {jsonEx.Message}. Body: {responseBody[..Math.Min(200, responseBody.Length)]}");
+                }
+
+                var clientSecret = intentData?.ClientSecret
+                    ?? throw new Exception("Missing client secret from payment server.");
+
+                // ── Step 2: Confirm card in-browser via Stripe.js ─────────────
+                var result = await JS.InvokeAsync<StripeConfirmResult>("stripeInterop.confirmPayment", clientSecret);
+                if (!result.Success)
+                {
+                    stripeCardError = result.Error ?? "Payment failed. Please check your card details.";
+                    isProcessing    = false;
+                    return;
+                }
+                paymentIntentId = result.PaymentIntentId ?? "pi_unknown";
+            }
+            else
+            {
+                // Tabby / Apple Pay — handled via their own redirect flows (demo stub)
+                paymentIntentId = "EXTERNAL_" + Guid.NewGuid().ToString()[..8].ToUpper();
+            }
+
+            // ── Step 3: Create the booking record ────────────────────────────
+            var transactionId = "TXN_" + paymentIntentId[^8..].ToUpper();
+            var destinationId = cartItems![0].DestinationId;
+
+            var booking = await BookingService.CreateAsync(userId, new CreateBookingDto(
+                DestinationId : destinationId > 0 ? destinationId : 1,
+                StartDate     : checkoutStartDate!.Value,
+                EndDate       : checkoutEndDate!.Value
+            ));
+
+            await BookingService.UpdateAfterPaymentAsync(booking.Id, new UpdateBookingPaymentDto(
+                NumberOfTravelers  : cartItems[0].Quantity > 0 ? cartItems[0].Quantity : 1,
+                TotalPrice         : totalPrice,
+                Subtotal           : subtotal,
+                Tax                : tax,
+                PaymentMethod      : paymentMethod,
+                ConfirmationNumber : "DOA-" + transactionId,
+                Status             : "Confirmed"
+            ));
+
+            Nav.NavigateTo($"/booking-confirmation/{booking.Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Booking failed: {ex.Message}";
+        }
+        finally { isProcessing = false; }
+    }
+
+    private void GoBack()
+    {
+        var destId = cartItems?.FirstOrDefault()?.DestinationId ?? 0;
+        Nav.NavigateTo(destId > 0 ? $"/planner?destinationId={destId}" : "/planner");
+    }
+
+    // ── Stripe interop result types ──────────────────────────────────────────
+    private record StripeIntentResult(string? ClientSecret);
+    private record StripeConfirmResult(bool Success, string? Error, string? PaymentIntentId);
+
+    private class CartItem
+    {
+        public string  Icon            { get; set; } = "🎯";
+        public string  ItemName        { get; set; } = "";
+        public string  Detail1         { get; set; } = "";
+        public string  Detail2         { get; set; } = "";
+        public int     Quantity        { get; set; }
+        public decimal Price           { get; set; }
+        public int     DestinationId   { get; set; }
+        public string  DestinationName { get; set; } = "";
+    }
+}

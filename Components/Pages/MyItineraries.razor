@@ -1,0 +1,530 @@
+@page "/itinerary"
+@page "/itinerary/{ItineraryId:int}"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using DunesOfArabia.Services
+@using DunesOfArabia.Models
+
+@attribute [Authorize]
+
+@inject IItineraryService ItineraryService
+@inject IDestinationService DestinationService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>My Itineraries – Saudi Heritage</PageTitle>
+
+<style>
+    .itin-page { padding: 2rem; background: #F5EFE8; min-height: 100vh; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 1.8rem; color: #7B3121; font-weight: 700; margin: 0; }
+    .page-header p  { color: #888; margin-top: 0.25rem; }
+    .btn-new { background: #7B3121; color: white; border: none; padding: 10px 22px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; white-space: nowrap; }
+    .btn-back { background: white; color: #7B3121; border: 1px solid #7B3121; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-bottom: 1.2rem; }
+    .itin-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 1.2rem; }
+    .itin-card { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; }
+    .itin-header { background: linear-gradient(135deg,#7B3121,#C8873A); padding: 1.2rem 1.4rem; color: white; }
+    .itin-header h3 { margin: 0; font-size: 1.1rem; }
+    .itin-dates  { font-size: 0.82rem; opacity: .85; margin-top: 4px; }
+    .itin-stops { padding: 1rem 1.4rem; flex: 1; }
+    .stop-row   { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.7rem; font-size: 0.9rem; color: #444; }
+    .stop-dot   { width: 10px; height: 10px; border-radius: 50%; background: #C8873A; margin-top: 5px; flex-shrink: 0; }
+    .pack-section { padding: 0 1.4rem 0.8rem; }
+    .pack-toggle  { background: none; border: none; color: #7B3121; font-size: 0.85rem; cursor: pointer; padding: 0; text-decoration: underline; }
+    .pack-list    { list-style: none; padding: 0.5rem 0 0; margin: 0; }
+    .pack-list li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #555; margin-bottom: 4px; }
+    .itin-footer { display: flex; gap: 0.6rem; padding: 0.9rem 1.4rem; border-top: 1px solid #F0E8E0; }
+    .btn-open   { flex: 1; background: #7B3121; color: white; border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+    .btn-del    { background: white; color: #c62828; border: 1px solid #c62828; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+    .empty-state    { background: white; border-radius: 14px; padding: 4rem; text-align: center; color: #888; }
+    .empty-state h3 { color: #7B3121; margin-bottom: 0.5rem; }
+    .empty-cta      { margin-top: 1.2rem; background: #7B3121; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; }
+    .loading-spinner { text-align: center; padding: 4rem; color: #7B3121; }
+    /* Detail view */
+    .detail-card { background: white; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+    .detail-hero { background: linear-gradient(135deg,#7B3121,#C8873A); padding: 2rem; color: white; }
+    .detail-hero h2 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+    .detail-body { padding: 1.5rem 2rem; }
+    .detail-section { margin-bottom: 1.5rem; }
+    .detail-section h4 { color: #7B3121; margin: 0 0 0.75rem; border-bottom: 1px solid #F0E8DC; padding-bottom: 0.4rem; }
+    .detail-row { display: flex; gap: 2rem; margin-bottom: 0.5rem; }
+    .detail-label { color: #888; font-size: 0.85rem; min-width: 120px; }
+    .detail-value { font-size: 0.9rem; color: #333; }
+    .activity-row { background: #F5EFE8; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem; font-size: 0.9rem; }
+    .activity-day { font-weight: 600; color: #7B3121; margin-right: 0.5rem; }
+    .packing-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 0.5rem; }
+    .pack-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #555; background: #F5EFE8; padding: 0.5rem 0.75rem; border-radius: 6px; }
+    .detail-actions { display: flex; gap: 1rem; padding: 1rem 2rem; border-top: 1px solid #F0E8DC; }
+    .btn-book { background: #C8873A; color: white; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn-del-detail { background: white; color: #c62828; border: 1px solid #c62828; padding: 10px 18px; border-radius: 8px; cursor: pointer; }
+</style>
+
+<div class="itin-page">
+
+    @if (ItineraryId.HasValue && detailRow != null)
+    {
+        @* ── DETAIL VIEW ── *@
+        <button class="btn-back" @onclick="@(() => Nav.NavigateTo("/itinerary"))">← Back to My Itineraries</button>
+
+        <div class="detail-card">
+            <div class="detail-hero">
+                <h2>@detailRow.Title</h2>
+                <div style="opacity:.85;font-size:.9rem">
+                    @detailRow.StartDate.ToString("dd MMM") – @detailRow.EndDate.ToString("dd MMM yyyy")
+                    &nbsp;·&nbsp; @detailRow.Days day@(detailRow.Days == 1 ? "" : "s")
+                </div>
+            </div>
+
+            <div class="detail-body">
+                <div class="detail-section">
+                    <h4>Trip Summary</h4>
+                    <div class="detail-row">
+                        <span class="detail-label">Destination</span>
+                        <span class="detail-value">@(string.IsNullOrEmpty(detailRow.DestName) ? "Not set" : detailRow.DestName)</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Duration</span>
+                        <span class="detail-value">@detailRow.Days day@(detailRow.Days == 1 ? "" : "s")</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Travel Dates</span>
+                        <span class="detail-value">@detailRow.StartDate.ToString("MMM dd, yyyy") → @detailRow.EndDate.ToString("MMM dd, yyyy")</span>
+                    </div>
+                </div>
+
+                @if (detailRow.Activities.Any())
+                {
+                    <div class="detail-section">
+                        <h4>Daily Activities (@detailRow.Activities.Count)</h4>
+                        @foreach (var act in detailRow.Activities.OrderBy(a => a.DayNumber))
+                        {
+                            <div class="activity-row">
+                                <span class="activity-day">Day @act.DayNumber</span>
+                                @act.Title
+                                @if (!string.IsNullOrEmpty(act.Description))
+                                {
+                                    <div style="color:#666;font-size:.82rem;margin-top:2px">@act.Description</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="detail-section">
+                    <h4>Packing List (@detailRow.PackingItems.Count(p => p.IsPacked)/@detailRow.PackingItems.Count packed)</h4>
+                    @if (detailRow.PackingItems.Any())
+                    {
+                        <div class="packing-grid">
+                            @foreach (var pi in detailRow.PackingItems)
+                            {
+                                var p = pi;
+                                <div class="pack-item" style="display:flex;align-items:center;gap:0.4rem;">
+                                    <input type="checkbox" checked="@p.IsPacked"
+                                           @onchange="@(() => DoTogglePackingAsync(p.Id))" />
+                                    <span style="flex:1;text-decoration:@(p.IsPacked ? "line-through" : "none");color:@(p.IsPacked ? "#aaa" : "#555")">@p.ItemName</span>
+                                    <button @onclick="() => RemovePackingItemAsync(p)"
+                                            style="background:none;border:none;color:#C62828;cursor:pointer;font-size:0.85rem;padding:0 4px;line-height:1;" title="Remove">✕</button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <div style="display:flex;gap:0.6rem;margin-top:1rem;">
+                        <input @bind="newPackingItem" @bind:event="oninput"
+                               placeholder="Add item to packing list..."
+                               style="flex:1;padding:8px 12px;border:1.5px solid #DDD;border-radius:7px;font-family:inherit;font-size:0.85rem;outline:none;"
+                               @onkeydown="OnPackingKeyDown" />
+                        <button @onclick="AddPackingItemAsync"
+                                disabled="@(isAddingItem || string.IsNullOrWhiteSpace(newPackingItem))"
+                                style="padding:8px 16px;background:#C8873A;color:white;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:0.84rem;">
+                            + Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-actions">
+                @if (!isEditingDetail)
+                {
+                    <button class="btn-book" @onclick="StartEditDetail">✏️ Edit Details</button>
+                    <button class="btn-book" style="background:#C8873A;" @onclick="EditInPlanner">🗺️ Edit in Planner</button>
+                    <button class="btn-del-detail" @onclick="() => DoDeleteDetailAsync()">🗑️ Delete</button>
+                }
+                else
+                {
+                    @* FIX 5: Inline edit — every field pre-filled from detailRow so nothing opens blank *@
+                    <div style="flex:1;display:flex;flex-direction:column;gap:0.75rem;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+                            <div>
+                                <label style="font-size:0.78rem;font-weight:600;color:#5A3A2A;display:block;margin-bottom:3px;">Title</label>
+                                <input @bind="editTitle"
+                                       style="width:100%;padding:8px 11px;border:1.5px solid #D8CCC4;border-radius:7px;font-family:inherit;font-size:0.86rem;box-sizing:border-box;" />
+                            </div>
+                            <div>
+                                <label style="font-size:0.78rem;font-weight:600;color:#5A3A2A;display:block;margin-bottom:3px;">Start Date</label>
+                                <input type="date" @bind="editStartDate" @bind:format="yyyy-MM-dd"
+                                       style="width:100%;padding:8px 11px;border:1.5px solid #D8CCC4;border-radius:7px;font-family:inherit;font-size:0.86rem;box-sizing:border-box;" />
+                            </div>
+                            <div>
+                                <label style="font-size:0.78rem;font-weight:600;color:#5A3A2A;display:block;margin-bottom:3px;">End Date</label>
+                                <input type="date" @bind="editEndDate" @bind:format="yyyy-MM-dd"
+                                       style="width:100%;padding:8px 11px;border:1.5px solid #D8CCC4;border-radius:7px;font-family:inherit;font-size:0.86rem;box-sizing:border-box;" />
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(editErrorMsg))
+                        {
+                            <div style="background:#fce4ec;color:#c62828;padding:0.6rem 0.9rem;border-radius:7px;font-size:0.84rem;">✕ @editErrorMsg</div>
+                        }
+                        <div style="display:flex;gap:0.6rem;">
+                            <button class="btn-book" disabled="@isSavingEdit" @onclick="SaveEditDetailAsync">
+                                @(isSavingEdit ? "Saving…" : "✓ Save Changes")
+                            </button>
+                            <button class="btn-del-detail" @onclick="CancelEditDetail">Cancel</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (ItineraryId.HasValue && detailRow == null && !isLoading)
+    {
+        <div class="empty-state">
+            <h3>Itinerary not found</h3>
+            <p>This itinerary may have been deleted or belongs to another account.</p>
+            <button class="empty-cta" @onclick="@(() => Nav.NavigateTo("/itinerary"))">← Back to My Itineraries</button>
+        </div>
+    }
+    else
+    {
+        @* ── LIST VIEW ── *@
+        <div class="page-header">
+            <div>
+                <h1>My Itineraries</h1>
+                <p>Plan and manage your personalised trip plans</p>
+            </div>
+            <button class="btn-new" @onclick="@(() => Nav.NavigateTo("/planner"))">+ New Itinerary</button>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-spinner">Loading your itineraries…</div>
+        }
+        else if (!string.IsNullOrEmpty(errorMsg))
+        {
+            <div style="background:white;border-radius:14px;padding:2rem;text-align:center;color:#c62828;">
+                <p>@errorMsg</p>
+                <button class="empty-cta" @onclick="@(() => Nav.NavigateTo("/planner"))">Plan a New Trip</button>
+            </div>
+        }
+        else if (!rows.Any())
+        {
+            <div class="empty-state">
+                <h3>No itineraries yet</h3>
+                <p>Start planning your next Saudi adventure!</p>
+                <button class="empty-cta" @onclick="@(() => Nav.NavigateTo("/planner"))">Create Itinerary</button>
+            </div>
+        }
+        else
+        {
+            <div class="itin-grid">
+                @foreach (var row in rows)
+                {
+                    var r = row;
+                    <div class="itin-card">
+                        <div class="itin-header">
+                            <h3>@r.Title</h3>
+                            <div class="itin-dates">
+                                @r.StartDate.ToString("dd MMM") – @r.EndDate.ToString("dd MMM yyyy")
+                                &nbsp;·&nbsp; @r.Days day@(r.Days == 1 ? "" : "s")
+                            </div>
+                        </div>
+                        <div class="itin-stops">
+                            @if (!string.IsNullOrEmpty(r.DestName))
+                            {
+                                <div class="stop-row">
+                                    <div class="stop-dot"></div>
+                                    <span>@r.DestName</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <p style="color:#aaa;font-size:.85rem">No destination set.</p>
+                            }
+                            @foreach (var act in r.Activities.Take(3))
+                            {
+                                <div class="stop-row" style="padding-left:1rem">
+                                    <div class="stop-dot" style="background:#e0c8bc"></div>
+                                    <span style="font-size:.83rem;color:#666">Day @act.DayNumber – @act.Title</span>
+                                </div>
+                            }
+                            @if (r.Activities.Count > 3)
+                            {
+                                <p style="font-size:.8rem;color:#aaa;margin:.25rem 0 0 1.7rem">+@(r.Activities.Count - 3) more activities</p>
+                            }
+                        </div>
+                        @if (r.PackingItems.Any())
+                        {
+                            <div class="pack-section">
+                                <button class="pack-toggle"
+                                        @onclick="@(() => r.ShowPacking = !r.ShowPacking)">
+                                    Packing (@r.PackingItems.Count(p => p.IsPacked)/@r.PackingItems.Count packed) @(r.ShowPacking ? "▲" : "▼")
+                                </button>
+                                @if (r.ShowPacking)
+                                {
+                                    <ul class="pack-list">
+                                        @foreach (var pi in r.PackingItems)
+                                        {
+                                            var p = pi;
+                                            <li>
+                                                <input type="checkbox" checked="@p.IsPacked"
+                                                       @onchange="@(() => DoTogglePackingAsync(p.Id))" />
+                                                <span style="text-decoration:@(p.IsPacked ? "line-through" : "none");color:@(p.IsPacked ? "#aaa" : "#555")">@p.ItemName</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        }
+                        <div class="itin-footer">
+                            @* FIX: Navigate to /itinerary/{id} which is now a valid route on this page *@
+                            <button class="btn-open" @onclick="@(() => Nav.NavigateTo("/itinerary/" + r.Id))">Open</button>
+                            <button class="btn-del"  @onclick="@(() => DoDeleteAsync(r))">Delete</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+
+    // FIX: Added optional route parameter so /itinerary/{id} renders the detail view
+    // instead of giving a 404. No separate page file needed.
+    [Parameter] public int? ItineraryId { get; set; }
+
+    private class ItinRow
+    {
+        public int                  Id           { get; set; }
+        public string               Title        { get; set; } = "";
+        public DateTime             StartDate    { get; set; }
+        public DateTime             EndDate      { get; set; }
+        public int                  Days         => (EndDate - StartDate).Days + 1;
+        public string               DestName     { get; set; } = "";
+        public int                  DestId       { get; set; }
+        public List<DailyActivity>  Activities   { get; set; } = new();
+        public List<PackingItem>    PackingItems { get; set; } = new();
+        public bool                 ShowPacking  { get; set; }
+    }
+
+    private bool          isLoading = true;
+    private List<ItinRow> rows      = new();
+    private ItinRow?      detailRow;
+    private string        userId    = "";
+    private string?       errorMsg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId   = auth.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+
+        try
+        {
+            var list = (await ItineraryService.GetUserItinerariesAsync(userId)).ToList();
+
+            if (list.Any())
+            {
+                var destIds = list
+                    .Select(i => i.DestinationId)
+                    .Where(id => id > 0)
+                    .Distinct()
+                    .ToList();
+
+                var destMap = destIds.Any()
+                    ? (await DestinationService.GetByIdsAsync(destIds)).ToDictionary(d => d.Id)
+                    : new Dictionary<int, Destination>();
+
+                rows = list.Select(itin =>
+                {
+                    destMap.TryGetValue(itin.DestinationId, out var dest);
+                    return new ItinRow
+                    {
+                        Id           = itin.Id,
+                        Title        = itin.Title,
+                        StartDate    = itin.StartDate,
+                        EndDate      = itin.EndDate,
+                        DestName     = dest?.Name ?? "",
+                        DestId       = itin.DestinationId,
+                        Activities   = itin.Activities?.ToList() ?? new(),
+                        PackingItems = itin.PackingItems?.ToList() ?? new()
+                    };
+                }).OrderByDescending(r => r.StartDate).ToList();
+            }
+
+            // If a specific itinerary was requested via URL, find it
+            if (ItineraryId.HasValue)
+            {
+                detailRow = rows.FirstOrDefault(r => r.Id == ItineraryId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[MyItineraries] " + ex.Message);
+            errorMsg = "Could not load your itineraries. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DoTogglePackingAsync(int itemId)
+    {
+        try
+        {
+            await ItineraryService.TogglePackingItemAsync(itemId);
+            foreach (var r in rows)
+            {
+                var pi = r.PackingItems.FirstOrDefault(p => p.Id == itemId);
+                if (pi != null) { pi.IsPacked = !pi.IsPacked; break; }
+            }
+            if (detailRow != null)
+            {
+                var pi = detailRow.PackingItems.FirstOrDefault(p => p.Id == itemId);
+                if (pi != null) pi.IsPacked = !pi.IsPacked;
+            }
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[MyItineraries] Toggle: " + ex.Message); }
+    }
+
+    private string  newPackingItem = "";
+    private bool    isAddingItem   = false;
+
+    // ── FIX 5: Inline edit state ─────────────────────────────────────────────
+    // Fields are populated by StartEditDetail() so the form is never blank.
+    private bool      isEditingDetail = false;
+    private bool      isSavingEdit    = false;
+    private string    editTitle       = "";
+    private DateTime  editStartDate   = DateTime.Today;
+    private DateTime  editEndDate     = DateTime.Today.AddDays(1);
+    private string?   editErrorMsg;
+
+    private void StartEditDetail()
+    {
+        if (detailRow == null) return;
+        editTitle       = detailRow.Title;
+        editStartDate   = detailRow.StartDate;
+        editEndDate     = detailRow.EndDate;
+        editErrorMsg    = null;
+        isEditingDetail = true;
+    }
+
+    private void CancelEditDetail()
+    {
+        isEditingDetail = false;
+        editErrorMsg    = null;
+    }
+
+    private async Task SaveEditDetailAsync()
+    {
+        if (detailRow == null) return;
+        editErrorMsg = null;
+
+        if (string.IsNullOrWhiteSpace(editTitle))
+        { editErrorMsg = "Title cannot be empty."; return; }
+        if (editEndDate < editStartDate)
+        { editErrorMsg = "End date must be on or after the start date."; return; }
+
+        isSavingEdit = true;
+        try
+        {
+            var updated = await ItineraryService.UpdateAsync(detailRow.Id, userId, editTitle.Trim(), editStartDate, editEndDate);
+            if (updated == null)
+            { editErrorMsg = "Could not save — itinerary not found."; return; }
+
+            detailRow.Title     = updated.Title;
+            detailRow.StartDate = updated.StartDate;
+            detailRow.EndDate   = updated.EndDate;
+
+            var listRow = rows.FirstOrDefault(r => r.Id == detailRow.Id);
+            if (listRow != null)
+            {
+                listRow.Title     = updated.Title;
+                listRow.StartDate = updated.StartDate;
+                listRow.EndDate   = updated.EndDate;
+            }
+
+            isEditingDetail = false;
+        }
+        catch (Exception ex)
+        {
+            editErrorMsg = $"Save failed: {ex.Message}";
+            Console.Error.WriteLine("[MyItineraries] SaveEdit: " + ex.Message);
+        }
+        finally { isSavingEdit = false; }
+    }
+
+    private void EditInPlanner()
+    {
+        if (detailRow == null) return;
+        var url = $"/planner?destinationId={detailRow.DestId}" +
+                  $"&startDate={detailRow.StartDate:yyyy-MM-dd}" +
+                  $"&endDate={detailRow.EndDate:yyyy-MM-dd}" +
+                  $"&itineraryId={detailRow.Id}";
+        Nav.NavigateTo(url);
+    }
+
+    private async Task OnPackingKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddPackingItemAsync();
+    }
+
+    private async Task AddPackingItemAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newPackingItem) || detailRow == null) return;
+        isAddingItem = true;
+        try
+        {
+            await ItineraryService.AddPackingItemAsync(detailRow.Id, new PackingItem { ItemName = newPackingItem.Trim(), IsPacked = false });
+            detailRow.PackingItems.Add(new PackingItem { ItemName = newPackingItem.Trim(), IsPacked = false });
+            newPackingItem = "";
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[Packing] Add: " + ex.Message); }
+        finally { isAddingItem = false; }
+    }
+
+    private async Task RemovePackingItemAsync(PackingItem item)
+    {
+        if (detailRow == null) return;
+        try
+        {
+            await ItineraryService.RemovePackingItemAsync(item.Id);
+            detailRow.PackingItems.Remove(item);
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[Packing] Remove: " + ex.Message); }
+    }
+
+    private async Task DoDeleteAsync(ItinRow r)
+    {
+        try
+        {
+            await ItineraryService.DeleteAsync(r.Id, userId);
+            rows.Remove(r);
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[MyItineraries] Delete: " + ex.Message); }
+    }
+
+    private async Task DoDeleteDetailAsync()
+    {
+        if (detailRow == null) return;
+        try
+        {
+            await ItineraryService.DeleteAsync(detailRow.Id, userId);
+            Nav.NavigateTo("/itinerary");
+        }
+        catch (Exception ex) { Console.Error.WriteLine("[MyItineraries] DeleteDetail: " + ex.Message); }
+    }
+}

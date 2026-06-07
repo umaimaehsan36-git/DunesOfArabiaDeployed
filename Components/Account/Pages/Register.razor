@@ -1,0 +1,467 @@
+@page "/Account/Register"
+
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using DunesOfArabia.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Create Account – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    .reg-page {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .reg-art {
+        background: linear-gradient(160deg, #3D1507 0%, #7B2D10 45%, #C8873A 100%);
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: flex-start;
+        padding: 3rem; position: relative; overflow: hidden;
+    }
+    .reg-art::before {
+        content: '';
+        position: absolute; inset: 0;
+        background:
+            radial-gradient(circle at 70% 30%, rgba(232,201,122,0.12) 0%, transparent 50%),
+            radial-gradient(circle at 20% 80%, rgba(90,20,5,0.4) 0%, transparent 50%);
+    }
+    .art-pattern {
+        position: absolute; inset: 0; opacity: 0.06;
+        background-image: repeating-linear-gradient(
+            45deg, #E8C97A 0px, #E8C97A 1px, transparent 1px, transparent 40px
+        ), repeating-linear-gradient(
+            -45deg, #E8C97A 0px, #E8C97A 1px, transparent 1px, transparent 40px
+        );
+    }
+    .art-inner { position: relative; z-index: 1; }
+    .art-logo  { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: #E8C97A; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2rem; }
+
+    .journey-steps { list-style: none; }
+    .journey-steps li {
+        display: flex; align-items: flex-start; gap: 1rem;
+        margin-bottom: 1.4rem; color: rgba(232,201,122,0.75);
+        font-size: 0.9rem; line-height: 1.5;
+    }
+    .step-num {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: rgba(232,201,122,0.15);
+        border: 1px solid rgba(232,201,122,0.3);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 700; color: #E8C97A;
+        flex-shrink: 0; margin-top: 1px;
+    }
+    .step-text strong { display: block; color: #E8C97A; margin-bottom: 2px; font-size: 0.92rem; }
+
+    .reg-form-side {
+        background: #FDFAF7;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 2.5rem 2rem; overflow-y: auto;
+    }
+    .form-wrapper { width: 100%; max-width: 440px; }
+
+    .form-eyebrow { font-size: 0.75rem; font-weight: 600; color: #C8873A; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.5rem; }
+    .form-title   { font-family: 'Playfair Display', serif; font-size: 1.9rem; font-weight: 700; color: #1C0F07; margin-bottom: 0.4rem; }
+    .form-subtitle { font-size: 0.88rem; color: #9A7060; margin-bottom: 1.8rem; font-weight: 300; }
+
+    .alert-error {
+        background: #FEF2F2; color: #991B1B;
+        border: 1px solid #FCA5A5;
+        border-radius: 8px; padding: .85rem 1rem;
+        margin-bottom: 1.4rem; font-size: .875rem;
+        display: flex; align-items: flex-start; gap: 0.5rem;
+    }
+
+    .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+
+    .form-group { margin-bottom: 1.3rem; }
+    .form-label { display: block; font-size: .82rem; font-weight: 600; color: #3A2015; margin-bottom: .45rem; }
+    .input-wrapper { position: relative; display: flex; align-items: center; }
+    .input-icon { position: absolute; left: 13px; font-size: 1rem; color: #C8873A; pointer-events: none; }
+    .form-input {
+        width: 100%; padding: 11px 13px 11px 40px;
+        border: 1.5px solid #E5D8C8; border-radius: 8px;
+        font-size: .88rem; font-family: inherit; color: #1C0F07;
+        background: #FFF;
+        transition: border-color .2s, box-shadow .2s; appearance: none;
+    }
+    .form-input:focus { outline: none; border-color: #7B2D10; box-shadow: 0 0 0 3px rgba(123,45,16,.10); }
+    .form-input::placeholder { color: #C4AE9E; }
+    .validation-error { color: #DC2626; font-size: .76rem; margin-top: .3rem; display: block; }
+
+    /* Phone country prefix */
+    .phone-prefix {
+        position: absolute; left: 0;
+        padding: 11px 10px 11px 40px;
+        color: #7B2D10; font-weight: 600; font-size: 0.88rem;
+        pointer-events: none;
+        border-right: 1px solid #E5D8C8;
+        background: transparent;
+    }
+    .phone-input { padding-left: 90px !important; }
+
+    /* Terms */
+    .terms-row {
+        display: flex; align-items: flex-start; gap: 10px;
+        margin-bottom: 1.3rem; padding: 12px 14px;
+        background: #FDFAF7; border: 1.5px solid #E5D8C8;
+        border-radius: 8px; cursor: pointer; transition: border-color .2s;
+    }
+    .terms-row:hover { border-color: #7B2D10; }
+    .terms-checkbox { width: 17px; height: 17px; accent-color: #7B2D10; cursor: pointer; flex-shrink: 0; margin-top: 2px; }
+    .terms-text { font-size: .84rem; color: #5A3E30; line-height: 1.5; user-select: none; }
+    .terms-text a { color: #7B2D10; font-weight: 600; text-decoration: none; }
+    .terms-text a:hover { text-decoration: underline; }
+    .terms-error { color: #DC2626; font-size: .76rem; margin-top: -.8rem; margin-bottom: 1rem; display: block; }
+
+    .btn-register {
+        width: 100%; padding: 14px;
+        background: linear-gradient(135deg, #7B2D10, #A03A18);
+        color: white; border: none; border-radius: 8px;
+        font-size: .95rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; letter-spacing: .3px;
+        transition: transform .15s, box-shadow .2s, opacity .2s;
+        margin-bottom: .4rem;
+    }
+    .btn-register:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(123,45,16,.40); }
+    .btn-register:active  { transform: translateY(0); }
+
+    .card-footer-text {
+        text-align: center; font-size: .88rem; color: #9A7060;
+        padding-top: 1.2rem; border-top: 1px solid #EFE6DC; margin-top: 1.2rem;
+    }
+    .card-footer-text a { color: #1C0F07; font-weight: 700; text-decoration: none; }
+    .card-footer-text a:hover { color: #7B2D10; text-decoration: underline; }
+
+    .success-box {
+        background: linear-gradient(135deg, #E8F9F0, #D0F0E0);
+        border: 1px solid #A0D8B8;
+        border-radius: 12px; padding: 2rem; text-align: center;
+    }
+    .success-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+    .success-box h3 { color: #1A6A3A; font-family: 'Playfair Display', serif; margin-bottom: 0.5rem; }
+    .success-box p  { color: #4A8A60; font-size: 0.88rem; margin-bottom: 1rem; }
+    .btn-go-login {
+        display: inline-block; padding: 10px 28px;
+        background: #1A6A3A; color: white; border-radius: 8px;
+        text-decoration: none; font-weight: 600; font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .btn-go-login:hover { background: #145530; }
+
+    @@media (max-width: 768px) {
+        .reg-page { grid-template-columns: 1fr; }
+        .reg-art  { display: none; }
+        .reg-form-side { padding: 2rem 1.5rem; }
+        .name-row { grid-template-columns: 1fr; }
+    }
+</style>
+
+<div class="reg-page">
+
+    <!-- Left art -->
+    <div class="reg-art">
+        <div class="art-pattern"></div>
+        <div class="art-inner">
+            <div class="art-logo">Saudi Heritage</div>
+            <ul class="journey-steps">
+                <li>
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <strong>Create your account</strong>
+                        Takes less than 2 minutes to get started.
+                    </div>
+                </li>
+                <li>
+                    <div class="step-num">2</div>
+                    <div class="step-text">
+                        <strong>Browse destinations</strong>
+                        Explore dozens of authentic Saudi heritage sites.
+                    </div>
+                </li>
+                <li>
+                    <div class="step-num">3</div>
+                    <div class="step-text">
+                        <strong>Book your journey</strong>
+                        Secure your trip in just a few clicks.
+                    </div>
+                </li>
+                <li>
+                    <div class="step-num">4</div>
+                    <div class="step-text">
+                        <strong>Experience Arabia</strong>
+                        Create memories that last a lifetime.
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Right form -->
+    <div class="reg-form-side">
+        <div class="form-wrapper">
+
+            @if (registrationSuccess)
+            {
+                <div class="success-box">
+                    <div class="success-icon">✅</div>
+                    <h3>Account Created!</h3>
+                    <p>Welcome to Saudi Heritage. A confirmation email has been sent to <strong>@registeredEmail</strong>. Please verify your email before signing in.</p>
+                    <a href="/Account/Login" class="btn-go-login">Go to Sign In →</a>
+                </div>
+            }
+            else
+            {
+                <div class="form-eyebrow">Join us today</div>
+                <h1 class="form-title">Create Account</h1>
+                <p class="form-subtitle">Start your Arabian adventure</p>
+
+                @if (Message != null)
+                {
+                    <div class="alert-error">⚠️ @Message</div>
+                }
+
+                <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                    <DataAnnotationsValidator />
+
+                    <!-- Name row -->
+                    <div class="name-row">
+                        <div class="form-group">
+                            <label class="form-label" for="Input.FirstName">First Name</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">👤</span>
+                                <InputText @bind-Value="Input.FirstName" id="Input.FirstName"
+                                           class="form-input" autocomplete="given-name"
+                                           aria-required="true" placeholder="Khalid" />
+                            </div>
+                            <ValidationMessage For="() => Input.FirstName" class="validation-error" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="Input.LastName">Last Name</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">👤</span>
+                                <InputText @bind-Value="Input.LastName" id="Input.LastName"
+                                           class="form-input" autocomplete="family-name"
+                                           aria-required="true" placeholder="Al-Harbi" />
+                            </div>
+                            <ValidationMessage For="() => Input.LastName" class="validation-error" />
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label class="form-label" for="Input.Email">Email Address</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">✉</span>
+                            <InputText @bind-Value="Input.Email" id="Input.Email"
+                                       class="form-input" autocomplete="username"
+                                       aria-required="true" placeholder="your.email@example.com" />
+                        </div>
+                        <ValidationMessage For="() => Input.Email" class="validation-error" />
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="form-group">
+                        <label class="form-label" for="Input.Phone">Phone Number <span style="color:#9A7060;font-weight:400;">(optional)</span></label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">📱</span>
+                            <span class="phone-prefix">+966</span>
+                            <InputText @bind-Value="Input.Phone" id="Input.Phone"
+                                       class="form-input phone-input"
+                                       autocomplete="tel" placeholder="5X XXX XXXX"
+                                       inputmode="tel" />
+                        </div>
+                        <ValidationMessage For="() => Input.Phone" class="validation-error" />
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label class="form-label" for="Input.Password">Password</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <InputText type="password"
+                                       @bind-Value="Input.Password" id="Input.Password"
+                                       class="form-input" autocomplete="new-password"
+                                       aria-required="true" placeholder="Min. 8 characters" />
+                        </div>
+                        <ValidationMessage For="() => Input.Password" class="validation-error" />
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="form-group">
+                        <label class="form-label" for="Input.ConfirmPassword">Confirm Password</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <InputText type="password"
+                                       @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword"
+                                       class="form-input" autocomplete="new-password"
+                                       aria-required="true" placeholder="Repeat password" />
+                        </div>
+                        <ValidationMessage For="() => Input.ConfirmPassword" class="validation-error" />
+                    </div>
+
+                    <!-- Terms -->
+                    <label class="terms-row">
+                        <InputCheckbox @bind-Value="Input.AgreeToTerms" id="Input.AgreeToTerms" class="terms-checkbox" />
+                        <span class="terms-text">
+                            I agree to the <a href="/terms">Terms of Service</a>
+                            and <a href="/privacy">Privacy Policy</a>
+                        </span>
+                    </label>
+                    <ValidationMessage For="() => Input.AgreeToTerms" class="terms-error" />
+
+                    <button type="submit" class="btn-register">Create Account</button>
+                </EditForm>
+
+                <div class="card-footer-text">
+                    Already have an account? <a href="/Account/Login">Sign in here</a>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+    private bool   isBusy              = false;
+    private bool   registrationSuccess = false;
+    private string registeredEmail     = "";
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null
+        : $"Error: {string.Join(", ", identityErrors.Select(e => e.Description))}";
+
+    protected override void OnInitialized() { Input ??= new(); }
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        isBusy = true;
+        var user = CreateUser();
+
+        user.FullName = $"{Input.FirstName} {Input.LastName}".Trim();
+        if (!string.IsNullOrWhiteSpace(Input.Phone))
+            user.PhoneNumber = "+966" + Input.Phone.TrimStart('+').TrimStart('9', '6', '6');
+
+        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
+        {
+            identityErrors        = result.Errors;
+            Input.Password        = "";
+            Input.ConfirmPassword = "";
+            isBusy = false;
+            return;
+        }
+
+        Logger.LogInformation("New user registered: {Email}", Input.Email);
+
+        if (!await UserManager.IsInRoleAsync(user, "User"))
+            await UserManager.AddToRoleAsync(user, "User");
+
+        // Auto-confirm email so users can log in immediately
+        // (remove this block once a verified sending domain is configured)
+        var confirmToken = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        await UserManager.ConfirmEmailAsync(user, confirmToken);
+
+        try
+        {
+            var userId = await UserManager.GetUserIdAsync(user);
+            var code   = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+            var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+                NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+                new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+            await EmailSender.SendConfirmationLinkAsync(user, Input.Email, callbackUrl);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Confirmation email could not be sent to {Email}.", Input.Email);
+        }
+
+        // FIX 7: Sign the user in immediately after registration so they land on
+        // the home/profile page directly — no "go to login" redirect needed.
+        // We already auto-confirmed the email above, so SignInAsync is valid.
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        NavigationManager.NavigateTo(ReturnUrl ?? "/profile", forceLoad: true);
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try { return Activator.CreateInstance<ApplicationUser>()!; }
+        catch { throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'."); }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "First name is required")]
+        [StringLength(50, ErrorMessage = "First name is too long")]
+        [Display(Name = "First Name")]
+        public string FirstName { get; set; } = "";
+
+        [Required(ErrorMessage = "Last name is required")]
+        [StringLength(50, ErrorMessage = "Last name is too long")]
+        [Display(Name = "Last Name")]
+        public string LastName { get; set; } = "";
+
+        [Required(ErrorMessage = "Email is required")]
+        [RegularExpression(
+            @"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,6}$",
+            ErrorMessage = "Enter a valid email address (e.g. name@example.com)")]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [RegularExpression(@"^$|^\d{7,15}$", ErrorMessage = "Enter a valid phone number (digits only)")]
+        [Display(Name = "Phone")]
+        public string? Phone { get; set; } = "";
+
+        [Required(ErrorMessage = "Password is required")]
+        [StringLength(100, ErrorMessage = "Password must be at least {2} characters.", MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "Passwords do not match")]
+        public string ConfirmPassword { get; set; } = "";
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "You must agree to the Terms of Service to continue")]
+        [Display(Name = "Terms & Conditions")]
+        public bool AgreeToTerms { get; set; } = false;
+    }
+}

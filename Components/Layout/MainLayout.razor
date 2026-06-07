@@ -1,0 +1,57 @@
+
+@inherits LayoutComponentBase
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;600&display=swap');
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+        height: 100%;
+        font-family: 'Lato', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #F5EFE8;
+    }
+
+    /* App shell layout */
+    .app-shell {
+        display: flex;
+        min-height: 100vh;
+    }
+
+    /* Main content sits to the right of the 210px sidebar */
+    .main-content {
+        margin-left: 210px;
+        flex: 1;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+        background-color: #F5EFE8;
+    }
+
+    .page-body {
+        flex: 1;
+    }
+
+    /* Mobile: sidebar hides */
+    @@media (max-width: 768px) {
+        .main-content {
+            margin-left: 0;
+            padding-top: 60px;
+        }
+    }
+</style>
+
+<div class="app-shell">
+
+    <!-- SIDEBAR -->
+    <SideNav />
+
+    <!-- PAGE CONTENT -->
+    <div class="main-content">
+        <div class="page-body">
+            @Body
+        </div>
+    </div>
+
+</div>

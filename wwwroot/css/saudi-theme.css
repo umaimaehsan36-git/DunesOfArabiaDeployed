@@ -1,0 +1,345 @@
+/* =====================================================
+   DUNES OF ARABIA - GLOBAL THEME CSS
+   =====================================================
+   This file contains CSS custom properties (variables) that define
+   the entire color scheme and styling system for the application.
+   
+   All components should reference these variables instead of 
+   hardcoding color values to maintain consistency.
+   ===================================================== */
+
+:root {
+    /* =========== PRIMARY COLORS =========== */
+    --color-primary-brown: #8B5A3C;
+    --color-primary-brown-dark: #5C3D2E;
+    --color-primary-brown-light: #D4AF8E;
+    --color-beige-light: #E8DCC8;
+    /* =========== NEUTRAL COLORS =========== */
+    --color-white: #FFFFFF;
+    --color-text-dark: #333333;
+    --color-text-gray: #666666;
+    --color-text-light: #8a7060;
+    --color-text-placeholder: #999999;
+    /* =========== STATUS COLORS =========== */
+    --color-error: #dc3545;
+    --color-error-bg: #f8d7da;
+    --color-error-border: #f5c6cb;
+    --color-error-text: #721c24;
+    --color-success: #28a745;
+    --color-success-bg: #d4edda;
+    --color-success-border: #c3e6cb;
+    --color-success-text: #155724;
+    --color-info: #17a2b8;
+    --color-warning: #ffc107;
+    /* =========== TYPOGRAPHY =========== */
+    --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-heading: Georgia, serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8rem;
+    --font-size-base: 0.95rem;
+    --font-size-lg: 1rem;
+    --font-size-xl: 1.1rem;
+    --font-size-2xl: 1.3rem;
+    --font-size-3xl: 1.8rem;
+    --font-size-4xl: 2rem;
+    --font-size-5xl: 2.5rem;
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    /* =========== SPACING =========== */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-xxl: 3rem;
+    /* =========== BORDER RADIUS =========== */
+    --border-radius-none: 0;
+    --border-radius-sm: 4px;
+    --border-radius-md: 6px;
+    --border-radius-lg: 12px;
+    --border-radius-full: 9999px;
+    /* =========== SHADOWS =========== */
+    --shadow-none: none;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.25);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+    --shadow-brown-hover: 0 8px 20px rgba(139, 90, 60, 0.4);
+    /* =========== ANIMATIONS =========== */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.3s ease;
+    --transition-slow: 0.6s ease-out;
+    /* =========== Z-INDEX =========== */
+    --z-base: 0;
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-fixed: 30;
+    --z-modal: 100;
+    --z-tooltip: 110;
+    /* =========== GRADIENTS =========== */
+    --gradient-primary: linear-gradient(135deg, #8B5A3C 0%, #5C3D2E 100%);
+    --gradient-primary-reverse: linear-gradient(135deg, #5C3D2E 0%, #8B5A3C 100%);
+    /* =========== COMPONENT DEFAULTS =========== */
+    /* Button */
+    --btn-primary-bg: var(--color-primary-brown);
+    --btn-primary-hover: var(--color-primary-brown-dark);
+    --btn-primary-text: var(--color-white);
+    --btn-primary-border: none;
+    --btn-secondary-bg: transparent;
+    --btn-secondary-border: var(--color-primary-brown);
+    --btn-secondary-text: var(--color-primary-brown);
+    --btn-disabled-bg: #cccccc;
+    --btn-disabled-text: #666666;
+    /* Input */
+    --input-border: var(--color-beige-light);
+    --input-border-focus: var(--color-primary-brown);
+    --input-bg: var(--color-white);
+    --input-text: var(--color-text-dark);
+    --input-placeholder: var(--color-text-placeholder);
+    --input-border-radius: var(--border-radius-md);
+    --input-focus-shadow: 0 0 0 4px rgba(139, 90, 60, 0.1);
+    /* Card */
+    --card-bg: var(--color-white);
+    --card-border: none;
+    --card-border-radius: var(--border-radius-lg);
+    --card-shadow: var(--shadow-xl);
+    /* Navbar */
+    --navbar-bg: var(--color-white);
+    --navbar-text: var(--color-text-dark);
+    --navbar-brand: var(--color-primary-brown);
+    --navbar-link-hover: var(--color-primary-brown);
+    /* Validation */
+    --validation-error-bg: var(--color-error-bg);
+    --validation-error-text: var(--color-error-text);
+    --validation-error-border: var(--color-error-border);
+    --validation-success-bg: var(--color-success-bg);
+    --validation-success-text: var(--color-success-text);
+    --validation-success-border: var(--color-success-border);
+}
+
+/* ===================================================
+   DARK MODE (Optional - implement if needed)
+   =================================================== */
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-white: #1a1a1a;
+        --color-text-dark: #f0f0f0;
+        --color-text-gray: #d0d0d0;
+        --card-bg: #2a2a2a;
+        --navbar-bg: #1a1a1a;
+    }
+}
+
+/* ===================================================
+   GLOBAL RESETS AND BASE STYLES
+   =================================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    font-family: var(--font-primary);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--color-text-dark);
+    background-color: var(--color-white);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading);
+    font-weight: var(--font-weight-bold);
+    margin-bottom: var(--spacing-md);
+}
+
+h1 {
+    font-size: var(--font-size-5xl);
+}
+
+h2 {
+    font-size: var(--font-size-3xl);
+}
+
+h3 {
+    font-size: var(--font-size-2xl);
+}
+
+h4 {
+    font-size: var(--font-size-xl);
+}
+
+h5,
+h6 {
+    font-size: var(--font-size-lg);
+}
+
+p {
+    margin-bottom: var(--spacing-md);
+}
+
+a {
+    color: var(--color-primary-brown);
+    text-decoration: none;
+    transition: color var(--transition-base);
+}
+
+    a:hover {
+        color: var(--color-primary-brown-dark);
+    }
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+/* ===================================================
+   UTILITY CLASSES
+   =================================================== */
+
+.text-primary {
+    color: var(--color-primary-brown);
+}
+
+.text-dark {
+    color: var(--color-text-dark);
+}
+
+.text-gray {
+    color: var(--color-text-gray);
+}
+
+.text-light {
+    color: var(--color-text-light);
+}
+
+.text-error {
+    color: var(--color-error);
+}
+
+.text-success {
+    color: var(--color-success);
+}
+
+.bg-primary {
+    background-color: var(--color-primary-brown);
+}
+
+.bg-light {
+    background-color: var(--color-beige-light);
+}
+
+.bg-white {
+    background-color: var(--color-white);
+}
+
+.bg-gradient {
+    background: var(--gradient-primary);
+}
+
+.rounded-sm {
+    border-radius: var(--border-radius-sm);
+}
+
+.rounded-md {
+    border-radius: var(--border-radius-md);
+}
+
+.rounded-lg {
+    border-radius: var(--border-radius-lg);
+}
+
+.shadow-sm {
+    box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+    box-shadow: var(--shadow-md);
+}
+
+.shadow-lg {
+    box-shadow: var(--shadow-lg);
+}
+
+.shadow-xl {
+    box-shadow: var(--shadow-xl);
+}
+
+.p-xs {
+    padding: var(--spacing-xs);
+}
+
+.p-sm {
+    padding: var(--spacing-sm);
+}
+
+.p-md {
+    padding: var(--spacing-md);
+}
+
+.p-lg {
+    padding: var(--spacing-lg);
+}
+
+.p-xl {
+    padding: var(--spacing-xl);
+}
+
+.m-xs {
+    margin: var(--spacing-xs);
+}
+
+.m-sm {
+    margin: var(--spacing-sm);
+}
+
+.m-md {
+    margin: var(--spacing-md);
+}
+
+.m-lg {
+    margin: var(--spacing-lg);
+}
+
+.m-xl {
+    margin: var(--spacing-xl);
+}
+
+/* ===================================================
+   ANIMATIONS & KEYFRAMES
+   =================================================== */
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

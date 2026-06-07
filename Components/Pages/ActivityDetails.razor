@@ -1,0 +1,479 @@
+@page "/activity/{id:int}"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@inject IActivityService ActivityService
+@inject IReviewService ReviewService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>@(activity?.Name ?? "Activity") – Dunes of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+    :root { --brand:#7B3121; --brand-h:#5C2318; --accent:#C8873A; --bg:#F5EFE8; }
+
+    .act-page { background:var(--bg); min-height:100vh; font-family:'Lato',sans-serif; }
+
+    /* loading / error */
+    .act-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; color:var(--brand); }
+    .spinner { width:40px; height:40px; border:4px solid #DDD; border-top-color:var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:1rem; }
+    @@keyframes spin { to { transform:rotate(360deg); } }
+    .act-error { margin:2rem; padding:1rem 1.5rem; background:#FFF0EE; border:1.5px solid #E8A090; border-radius:8px; color:#7B2010; }
+    .act-error a { color:var(--brand); font-weight:600; margin-left:0.5rem; }
+
+    /* breadcrumb */
+    .act-bc { background:white; border-bottom:1px solid #EAE0D8; padding:0.8rem 2rem; font-size:0.8rem; color:#9A8878; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .act-bc a { color:var(--brand); text-decoration:none; font-weight:600; }
+    .act-bc a:hover { text-decoration:underline; }
+
+    /* hero */
+    .act-hero { position:relative; height:400px; overflow:hidden; }
+    .act-hero img { width:100%; height:100%; object-fit:cover; display:block; }
+    .act-hero-grad { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.78) 0%, transparent 50%); display:flex; align-items:flex-end; padding:2.5rem 2rem; }
+    .act-hero-inner { color:white; }
+    .hero-tags { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem; }
+    .htag { padding:4px 13px; border-radius:20px; font-size:0.73rem; font-weight:700; }
+    .htag-cat  { background:rgba(123,49,33,0.92); }
+    .htag-diff { background:rgba(200,135,58,0.95); }
+    .htag-rat  { background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); backdrop-filter:blur(3px); }
+    .act-hero-title { font-family:'Playfair Display',serif; font-size:clamp(1.8rem,4vw,2.8rem); font-weight:700; margin:0; line-height:1.2; }
+    .act-hero-dest  { font-size:0.88rem; margin-top:0.4rem; opacity:0.82; }
+    .act-hero-dest a { color:#FFD89A; text-decoration:none; font-weight:600; }
+    .act-hero-dest a:hover { text-decoration:underline; }
+
+    /* layout */
+    .act-body { display:grid; grid-template-columns:1fr 380px; gap:2rem; max-width:1200px; margin:0 auto; padding:2rem; align-items:start; }
+
+    /* fact strip */
+    .fact-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+    .fact-box { background:white; border-radius:10px; padding:1.1rem 0.85rem; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-top:3px solid var(--brand); }
+    .fbi { font-size:1.5rem; display:block; margin-bottom:0.3rem; }
+    .fbv { font-weight:700; color:var(--brand); font-size:1rem; display:block; }
+    .fbl { font-size:0.73rem; color:#9A8878; display:block; margin-top:2px; }
+
+    /* content cards */
+    .c-card { background:white; border-radius:12px; padding:1.6rem 1.75rem; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:1.5rem; }
+    .c-card h2 { font-family:'Playfair Display',serif; color:var(--brand); font-size:1.12rem; margin:0 0 1.1rem; border-bottom:2px solid var(--brand); padding-bottom:0.45rem; }
+    .c-desc { color:#555; line-height:1.8; font-size:0.95rem; margin:0; }
+
+    /* included */
+    .inc-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.55rem; }
+    .inc-item { display:flex; align-items:center; gap:0.7rem; background:var(--bg); padding:0.6rem 0.85rem; border-radius:7px; font-size:0.87rem; color:#444; }
+    .inc-check { color:#2E7D32; font-weight:700; font-size:1rem; flex-shrink:0; }
+
+    /* policy */
+    .policy-box { background:#FFF8DC; border-left:4px solid var(--accent); padding:1rem 1.25rem; border-radius:0 8px 8px 0; color:#555; line-height:1.7; font-size:0.89rem; margin:0; }
+
+    /* reviews */
+    .rev-list { display:flex; flex-direction:column; gap:1rem; }
+    .rev-card { background:var(--bg); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:1rem 1.25rem; }
+    .rev-top  { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; }
+    .rev-top strong { color:#1C1008; font-size:0.89rem; }
+    .rev-stars { color:var(--accent); }
+    .rev-text  { color:#555; font-size:0.86rem; line-height:1.6; margin:0.25rem 0; }
+    .rev-date  { font-size:0.77rem; color:#9A8878; }
+    .no-rev    { text-align:center; color:#9A8878; padding:2rem; font-size:0.9rem; }
+
+    /* ── BOOKING SIDEBAR ── */
+    .bk-sidebar { position:sticky; top:20px; display:flex; flex-direction:column; gap:1.25rem; }
+
+    /* intent banner — sets the purpose clearly */
+    .intent-banner { background:linear-gradient(135deg,var(--brand),#9B4535); border-radius:12px; padding:1.25rem 1.4rem; color:white; }
+    .intent-banner h3 { font-family:'Playfair Display',serif; font-size:1.05rem; margin:0 0 0.3rem; }
+    .intent-banner p  { font-size:0.82rem; opacity:0.85; margin:0; line-height:1.5; }
+
+    /* booking widget */
+    .bk-widget { background:white; border-radius:14px; padding:1.6rem; box-shadow:0 4px 20px rgba(123,49,33,0.1); border:1.5px solid #EAE0D8; }
+
+    .price-top { text-align:center; padding-bottom:1.1rem; border-bottom:2px solid var(--bg); margin-bottom:1.2rem; }
+    .price-lbl { font-size:0.78rem; color:#9A8878; display:block; margin-bottom:0.2rem; }
+    .price-big { font-family:'Playfair Display',serif; font-size:2.1rem; font-weight:700; color:var(--brand); }
+    .price-cur { font-size:0.95rem; font-weight:400; color:#9A8878; vertical-align:super; margin-right:2px; }
+
+    .bk-field { margin-bottom:1rem; }
+    .bk-field label { display:block; font-size:0.82rem; font-weight:600; color:#3A2A1E; margin-bottom:0.35rem; }
+    .bk-input, .bk-select { width:100%; padding:0.65rem 0.85rem; border:1.5px solid #DDD3C8; border-radius:7px; font-size:0.88rem; font-family:inherit; box-sizing:border-box; color:#1C1008; outline:none; transition:border-color 0.2s, box-shadow 0.2s; }
+    .bk-input:focus, .bk-select:focus { border-color:var(--brand); box-shadow:0 0 0 3px rgba(123,49,33,0.08); }
+
+    /* stepper */
+    .stepper { display:flex; align-items:center; }
+    .sp-btn { width:36px; height:38px; border:1.5px solid #DDD3C8; background:white; color:#3A2A1E; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s; }
+    .sp-btn:first-child { border-radius:7px 0 0 7px; }
+    .sp-btn:last-child  { border-radius:0 7px 7px 0; }
+    .sp-btn:hover:not(:disabled) { background:var(--bg); border-color:#C4A090; }
+    .sp-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .sp-val { min-width:50px; height:38px; border:1.5px solid #DDD3C8; border-left:none; border-right:none; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--brand); background:white; font-size:0.95rem; }
+
+    /* totals */
+    .totals { background:var(--bg); border-radius:8px; padding:0.95rem 1.05rem; margin:1rem 0; }
+    .t-line { display:flex; justify-content:space-between; font-size:0.85rem; color:#7A6658; padding:0.3rem 0; }
+    .t-total { display:flex; justify-content:space-between; border-top:2px solid var(--brand); padding-top:0.55rem; margin-top:0.3rem; font-weight:700; color:var(--brand); font-size:0.96rem; }
+
+    /* CTA */
+    .btn-book-now { display:block; width:100%; padding:0.9rem; background:var(--brand); color:white; border:none; border-radius:8px; font-size:0.96rem; font-weight:700; font-family:inherit; cursor:pointer; text-align:center; text-decoration:none; transition:background 0.2s, transform 0.15s; margin-bottom:0.55rem; }
+    .btn-book-now:hover { background:var(--brand-h); transform:translateY(-1px); }
+    .btn-share-act { display:block; width:100%; padding:0.72rem; background:white; color:var(--brand); border:1.5px solid var(--brand); border-radius:8px; font-size:0.86rem; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; transition:background 0.2s; }
+    .btn-share-act:hover { background:var(--bg); }
+    .share-toast { background:#2E7D32; color:white; padding:0.45rem 0.9rem; border-radius:6px; font-size:0.81rem; text-align:center; margin-top:0.45rem; }
+    .bk-error { background:#FFF0EE; color:#7B2010; padding:0.6rem 0.85rem; border-radius:6px; font-size:0.84rem; border:1px solid #E8A090; margin-top:0.5rem; }
+
+    /* operator */
+    .op-card { background:white; border-radius:12px; padding:1.2rem 1.4rem; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+    .op-card h3 { font-family:'Playfair Display',serif; color:var(--brand); font-size:0.98rem; margin:0 0 0.8rem; border-bottom:1px solid #EAE0D8; padding-bottom:0.45rem; }
+    .op-row { font-size:0.86rem; color:#555; margin-bottom:0.4rem; }
+    .op-row strong { color:#1C1008; display:block; margin-bottom:2px; }
+    .btn-op-email { display:block; width:100%; margin-top:0.7rem; padding:0.62rem; text-align:center; background:var(--bg); border:1.5px solid #C4A090; border-radius:7px; color:var(--brand); font-size:0.83rem; font-weight:600; text-decoration:none; transition:border-color 0.2s,background 0.2s; }
+    .btn-op-email:hover { border-color:var(--brand); background:white; }
+
+    @@media (max-width:1024px) { .act-body { grid-template-columns:1fr; padding:1rem; } .bk-sidebar { position:static; } }
+    @@media (max-width:640px)  { .fact-strip { grid-template-columns:1fr 1fr; } .inc-grid { grid-template-columns:1fr; } .act-hero { height:260px; } .act-hero-grad { padding:1.5rem 1rem; } .act-bc { padding:0.7rem 1rem; } }
+</style>
+
+<div class="act-page">
+
+    @if (activity == null && !loadError)
+    {
+        <div class="act-loading">
+            <div class="spinner"></div>
+            <p>Loading activity...</p>
+        </div>
+    }
+    else if (loadError)
+    {
+        <div class="act-error" role="alert">
+            ⚠️ @errorMessage
+            <a href="/destinations">← Back to Destinations</a>
+        </div>
+    }
+    else if (activity != null)
+    {
+        <!-- Breadcrumb -->
+        <nav class="act-bc" aria-label="breadcrumb">
+            <a href="/destinations">Destinations</a>
+            <span>›</span>
+            @if (!string.IsNullOrEmpty(destinationName))
+            {
+                <a href="/destination/@activity.DestinationId">@destinationName</a>
+                <span>›</span>
+            }
+            <span>@activity.Name</span>
+        </nav>
+
+        <!-- Hero — full-bleed image with title overlaid -->
+        <div class="act-hero">
+            <img src="@activity.ImageUrl" alt="@activity.Name"
+                 onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1200'" />
+            <div class="act-hero-grad">
+                <div class="act-hero-inner">
+                    <div class="hero-tags">
+                        <span class="htag htag-cat">@activity.Category</span>
+                        <span class="htag htag-diff">@activity.DifficultyLevel</span>
+                        @if (activity.Rating > 0)
+                        {
+                            <span class="htag htag-rat">⭐ @activity.Rating.ToString("F1")</span>
+                        }
+                    </div>
+                    <h1 class="act-hero-title">@activity.Name</h1>
+                    @if (!string.IsNullOrEmpty(destinationName))
+                    {
+                        <p class="act-hero-dest">
+                            📍 Part of
+                            <a href="/destination/@activity.DestinationId">@destinationName</a>
+                            — <a href="/destination/@activity.DestinationId">browse all activities there →</a>
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Main body -->
+        <div class="act-body">
+
+            <!-- ── LEFT COLUMN: Activity info only ── -->
+            <div>
+
+                <!-- At-a-glance facts -->
+                <div class="fact-strip">
+                    <div class="fact-box">
+                        <span class="fbi">⏱️</span>
+                        <span class="fbv">@activity.Duration <small style="font-size:0.68rem;font-weight:400;color:#9A8878;">min</small></span>
+                        <span class="fbl">Duration</span>
+                    </div>
+                    <div class="fact-box">
+                        <span class="fbi">📊</span>
+                        <span class="fbv">@activity.DifficultyLevel</span>
+                        <span class="fbl">Difficulty</span>
+                    </div>
+                    <div class="fact-box">
+                        <span class="fbi">👥</span>
+                        <span class="fbv">@activity.MaxParticipants</span>
+                        <span class="fbl">Max Group</span>
+                    </div>
+                    @{ var _minAge = activity.MinAge > 0 ? activity.MinAge
+                           : activity.Category?.ToLower() switch {
+                               "adventure" => 12, "water" => 8, "desert" => 6, _ => 5
+                           };
+                       var _minAgeLabel = _minAge == 5 ? "All ages" : $"{_minAge}+ yrs"; }
+                    <div class="fact-box">
+                        <span class="fbi">👶</span>
+                        <span class="fbv">@_minAgeLabel</span>
+                        <span class="fbl">Min Age</span>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="c-card">
+                    <h2>About This Activity</h2>
+                    <p class="c-desc">@activity.Description</p>
+                </div>
+
+                <!-- What's included -->
+                @if (activity.IncludedServices != null && activity.IncludedServices.Any())
+                {
+                    <div class="c-card">
+                        <h2>✅ What's Included</h2>
+                        <div class="inc-grid">
+                            @foreach (var svc in activity.IncludedServices)
+                            {
+                                <div class="inc-item"><span class="inc-check">✓</span><span>@svc</span></div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Cancellation policy -->
+                @{ var _policy = string.IsNullOrWhiteSpace(activity.CancellationPolicy)
+                       ? "Free cancellation up to 24 hours before the activity. Cancellations within 24 hours are non-refundable."
+                       : activity.CancellationPolicy; }
+                <div class="c-card">
+                    <h2>❌ Cancellation Policy</h2>
+                    <p class="policy-box">@_policy</p>
+                </div>
+
+                <!-- Reviews for this specific activity -->
+                <div class="c-card">
+                    <h2>⭐ Reviews for This Activity (@reviews.Count)</h2>
+                    @if (reviews.Any())
+                    {
+                        <div class="rev-list">
+                            @foreach (var r in reviews.Take(5))
+                            {
+                                <div class="rev-card">
+                                    <div class="rev-top">
+                                        <strong>@r.UserName</strong>
+                                        <span class="rev-stars">@(new string('★', (int)r.Rating))</span>
+                                    </div>
+                                    <p class="rev-text">@r.Text</p>
+                                    <small class="rev-date">@r.CreatedDate.ToString("MMM dd, yyyy")</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-rev">No reviews for this activity yet — be the first!</p>
+                    }
+                </div>
+            </div>
+
+            <!-- ── RIGHT COLUMN: Book THIS activity ── -->
+            <aside class="bk-sidebar">
+
+                <!-- Purpose banner — makes the page's job crystal clear -->
+                <div class="intent-banner">
+                    <h3>🎫 Book This Activity</h3>
+                    <p>
+                        Pick your date, time and group size below and go straight to checkout.
+                        Want to combine this with other activities?
+                        <a href="/destination/@activity.DestinationId" style="color:#FFD89A;font-weight:600;text-decoration:none;">
+                            Go back to @(destinationName ?? "the destination") →
+                        </a>
+                    </p>
+                </div>
+
+                <!-- Booking widget -->
+                <div class="bk-widget">
+
+                    <div class="price-top">
+                        <span class="price-lbl">Price per person</span>
+                        <div class="price-big"><span class="price-cur">SR</span>@activity.Price.ToString("N0")</div>
+                    </div>
+
+                    <!-- Participants -->
+                    <div class="bk-field">
+                        <label>Participants</label>
+                        <div class="stepper">
+                            <button class="sp-btn"
+                                    @onclick="() => { if (participants > 1) participants--; }"
+                                    disabled="@(participants <= 1)">−</button>
+                            <div class="sp-val">@participants</div>
+                            <button class="sp-btn"
+                                    @onclick="() => { if (participants < activity.MaxParticipants) participants++; }"
+                                    disabled="@(participants >= activity.MaxParticipants)">+</button>
+                        </div>
+                        <small style="font-size:0.77rem;color:#9A8878;display:block;margin-top:4px;">Max @activity.MaxParticipants per group · Min age @_minAge yrs</small>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="bk-field">
+                        <label>Date</label>
+                        <input type="date" class="bk-input" @bind="selectedDate" @bind:format="yyyy-MM-dd" min="@minDate" />
+                    </div>
+
+                    <!-- Time -->
+                    <div class="bk-field">
+                        <label>Time Slot</label>
+                        <select class="bk-select" @bind="selectedTime">
+                            <option value="">Choose a time</option>
+                            <option value="09:00 AM">09:00 AM – Morning</option>
+                            <option value="02:00 PM">02:00 PM – Afternoon</option>
+                            <option value="04:00 PM">04:00 PM – Late Afternoon</option>
+                        </select>
+                    </div>
+
+                    <!-- Price summary -->
+                    <div class="totals">
+                        <div class="t-line"><span>@participants × SR @activity.Price.ToString("N0")</span><span>SR @((activity.Price * participants).ToString("N0"))</span></div>
+                        <div class="t-line"><span>Tax (15% VAT)</span><span>SR @((activity.Price * participants * 0.15m).ToString("N0"))</span></div>
+                        <div class="t-total"><span>Total</span><strong>SR @((activity.Price * participants * 1.15m).ToString("N0"))</strong></div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage) && !loadError)
+                    {
+                        <div class="bk-error">⚠️ @errorMessage</div>
+                    }
+
+                    @if (isAuthenticated)
+                    {
+                        <button @onclick="HandleBooking" class="btn-book-now">🎫 Book Now — Proceed to Checkout</button>
+                    }
+                    else
+                    {
+                        <a href="/Account/Login?returnUrl=@Uri.EscapeDataString(Nav.Uri)" class="btn-book-now">
+                            🎫 Log In to Book
+                        </a>
+                    }
+
+                    <button @onclick="ShareActivity" class="btn-share-act">🔗 Share This Activity</button>
+
+                    @if (showShareToast)
+                    {
+                        <div class="share-toast">✅ Link copied to clipboard!</div>
+                    }
+                </div>
+
+                <!-- Operator info -->
+                @{
+                    var _opName  = string.IsNullOrWhiteSpace(activity.OperatorName)  ? "Dunes of Arabia" : activity.OperatorName;
+                    var _opEmail = string.IsNullOrWhiteSpace(activity.OperatorEmail) ? "support@dunesofarabia.com" : activity.OperatorEmail;
+                    var _opPhone = string.IsNullOrWhiteSpace(activity.OperatorPhone) ? "+966 920 001 234" : activity.OperatorPhone;
+                }
+                <div class="op-card">
+                    <h3>Run by @_opName</h3>
+                    <div class="op-row">
+                        <strong>Contact</strong>
+                        📧 @_opEmail<br />
+                        📞 @_opPhone
+                    </div>
+                    <a href="mailto:@_opEmail" class="btn-op-email">📧 Email the Operator</a>
+                </div>
+
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Activity? activity;
+    private string?   destinationName;
+    private List<Review> reviews      = new();
+    private bool      isAuthenticated = false;
+    private bool      loadError       = false;
+    private bool      showShareToast  = false;
+    private string    minDate         = DateTime.Now.ToString("yyyy-MM-dd");
+    private int       participants    = 1;
+    private DateTime? selectedDate    = DateTime.Now.AddDays(1);
+    private string    selectedTime    = "";
+    private string    errorMessage    = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState   = await AuthStateProvider.GetAuthenticationStateAsync();
+            isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+            activity = await ActivityService.GetByIdAsync(Id);
+            if (activity == null) { Nav.NavigateTo("/destinations"); return; }
+
+            destinationName = activity.Destination?.Name;
+            reviews = (await ReviewService.GetByActivityIdAsync(Id)).ToList();
+        }
+        catch (Exception ex)
+        {
+            loadError     = true;
+            errorMessage  = "Failed to load activity details. Please try again.";
+            Console.WriteLine($"[ActivityDetails] {ex.Message}");
+        }
+    }
+
+    // HandleBooking: skips the Planner entirely — goes straight to /checkout
+    // This is intentional: the user is booking ONE specific activity, not planning a multi-day trip.
+    private async Task HandleBooking()
+    {
+        errorMessage = "";
+
+        if (participants < 1)       { errorMessage = "Select at least 1 participant."; return; }
+        if (!selectedDate.HasValue) { errorMessage = "Please pick a date."; return; }
+        if (selectedDate.Value.Date < DateTime.Today) { errorMessage = "Please select a future date."; return; }
+        if (string.IsNullOrWhiteSpace(selectedTime))  { errorMessage = "Please choose a time slot."; return; }
+
+        if (!isAuthenticated)
+        {
+            Nav.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString(Nav.Uri)}");
+            return;
+        }
+
+        try
+        {
+            var startDateStr = selectedDate.Value.ToString("yyyy-MM-dd");
+            var endDate      = selectedDate.Value.AddHours((double)activity!.DurationHours);
+            var endDateStr   = endDate.Date == selectedDate.Value.Date
+                               ? startDateStr : endDate.ToString("yyyy-MM-dd");
+
+            // Goes directly to checkout — NOT the Planner.
+            // planPrice is 0 (no multi-day plan), activityTotal carries the real price.
+            var qs = $"destinationId={activity.DestinationId}" +
+                     $"&destinationName={Uri.EscapeDataString(destinationName ?? activity.Name)}" +
+                     $"&planName={Uri.EscapeDataString(activity.Name)}" +
+                     $"&planPrice=0" +
+                     $"&travelers={participants}" +
+                     $"&startDate={startDateStr}" +
+                     $"&endDate={endDateStr}" +
+                     $"&activities={Id}" +
+                     $"&activityTotal={activity.Price}";
+
+            Nav.NavigateTo($"/checkout?{qs}");
+        }
+        catch (Exception ex) { errorMessage = $"Error: {ex.Message}"; }
+    }
+
+    private async Task ShareActivity()
+    {
+        var url = $"{Nav.BaseUri}activity/{Id}";
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            showShareToast = true;
+            _ = Task.Delay(3000).ContinueWith(_ => { showShareToast = false; InvokeAsync(StateHasChanged); });
+        }
+        catch { errorMessage = $"Share: {url}"; }
+    }
+}

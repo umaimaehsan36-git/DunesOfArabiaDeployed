@@ -1,0 +1,330 @@
+@page "/activities"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@inject IActivityService  ActivityService
+@inject NavigationManager Nav
+
+<PageTitle>Activities & Experiences – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+    .activities-page { background: #F5EFE8; min-height: 100vh; font-family: 'Lato', sans-serif; padding-bottom: 4rem; }
+    .page-header { padding: 2.5rem 2.2rem 0; }
+    .page-header h1 { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.9rem, 3.5vw, 2.6rem); color: #1C1008; font-weight: 700; margin-bottom: 0.35rem; }
+    .page-header p  { font-size: 0.88rem; color: #8A7566; font-weight: 300; margin-bottom: 1.8rem; }
+    .flow-hint { margin: 0 2.2rem 0; background: #FFF8DC; border: 1.5px solid #C8873A; border-radius: 8px; padding: 0.85rem 1.2rem; font-size: 0.85rem; color: #5C3D00; display: flex; align-items: center; gap: 0.6rem; }
+    .featured-hero { display: grid; grid-template-columns: 1fr 1fr; background: white; overflow: hidden; min-height: 420px; }
+    .featured-hero-img { width: 100%; height: 100%; min-height: 380px; object-fit: cover; display: block; }
+    .featured-hero-body { padding: 2.5rem 2.8rem; display: flex; flex-direction: column; justify-content: center; }
+    .featured-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 2px; color: #C8873A; text-transform: uppercase; margin-bottom: 0.9rem; }
+    .featured-hero-body h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.85rem; color: #1C1008; font-weight: 700; line-height: 1.2; margin-bottom: 0.9rem; }
+    .featured-hero-body .feat-desc { font-size: 0.88rem; color: #7A6658; line-height: 1.65; margin-bottom: 1.3rem; font-weight: 300; }
+    .featured-meta { display: flex; align-items: center; font-size: 0.83rem; color: #7A6658; margin-bottom: 1.6rem; flex-wrap: wrap; gap: 0; }
+    .featured-meta .meta-item { display: flex; align-items: center; gap: 4px; }
+    .meta-dot { width: 4px; height: 4px; background: #C4A090; border-radius: 50%; margin: 0 10px; flex-shrink: 0; display: inline-block; }
+    .btn-explore-dest { display: inline-flex; align-items: center; gap: 8px; padding: 12px 26px; background: #7B3121; color: white; border: none; border-radius: 7px; font-size: 0.9rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s, transform 0.15s; width: fit-content; text-decoration: none; }
+    .btn-explore-dest:hover { background: #5C2218; color: white; transform: translateY(-1px); }
+    .filter-strip { display: flex; align-items: center; gap: 0.5rem; padding: 1.4rem 2.2rem; flex-wrap: wrap; }
+    .filter-chip { padding: 7px 18px; border-radius: 6px; font-size: 0.84rem; font-weight: 500; font-family: inherit; cursor: pointer; border: 1.5px solid #C4A090; background: white; color: #5A3A2A; transition: background 0.18s, border-color 0.18s, color 0.18s; }
+    .filter-chip:hover  { border-color: #7B3121; color: #7B3121; }
+    .filter-chip.active { background: #7B3121; border-color: #7B3121; color: white; }
+    .act-section-wrap { padding: 0 2.2rem 2.5rem; }
+    .act-section-title { font-family: 'Playfair Display', Georgia, serif; font-size: 1.35rem; color: #1C1008; font-weight: 700; margin-bottom: 1.2rem; }
+    .act-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.3rem; }
+    .act-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(90,55,35,0.07); transition: transform 0.25s, box-shadow 0.25s; display: flex; flex-direction: column; }
+    .act-card:hover { transform: translateY(-4px); box-shadow: 0 8px 22px rgba(90,55,35,0.13); }
+    .act-img-wrap { position: relative; overflow: hidden; }
+    .act-img-wrap img { width: 100%; height: 190px; object-fit: cover; display: block; transition: transform 0.4s ease; }
+    .act-card:hover .act-img-wrap img { transform: scale(1.04); }
+    .diff-badge { position: absolute; top: 10px; right: 10px; padding: 3px 11px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+    .diff-badge.easy        { background: #D4F5E2; color: #1A7A42; }
+    .diff-badge.moderate    { background: #FFF3CC; color: #7A5A00; }
+    .diff-badge.challenging { background: #FFE0DC; color: #7A2010; }
+    .act-card-body { padding: 1.1rem 1.2rem 1.25rem; flex: 1; display: flex; flex-direction: column; }
+    .act-card-name { font-family: 'Playfair Display', Georgia, serif; font-size: 1.05rem; color: #1C1008; font-weight: 700; margin-bottom: 0.5rem; }
+    .act-card-desc { font-size: 0.82rem; color: #7A6658; line-height: 1.5; margin-bottom: 0.9rem; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .act-card-meta { display: flex; align-items: center; gap: 1rem; font-size: 0.79rem; color: #7A6658; margin-bottom: 0.9rem; }
+    .act-card-meta .meta-item { display: flex; align-items: center; gap: 4px; }
+    .act-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: auto; }
+    /* Primary CTA — Details & Book */
+    .btn-details-primary { display: block; padding: 9px; text-align: center; font-size: 0.82rem; font-weight: 700; color: white; border: 1.5px solid #7B3121; border-radius: 7px; background: #7B3121; cursor: pointer; font-family: inherit; transition: background 0.2s, color 0.2s; text-decoration: none; }
+    .btn-details-primary:hover { background: #5C2218; border-color: #5C2218; color: white; }
+
+    .btn-plan { padding: 9px; text-align: center; font-size: 0.82rem; font-weight: 600; color: white; background: #C8873A; border: 1.5px solid #C8873A; border-radius: 7px; cursor: pointer; font-family: inherit; transition: background 0.2s, border-color 0.2s; text-decoration: none; display: block; }
+    .btn-plan:hover { background: #A56A28; border-color: #A56A28; }
+    .skel-hero { display: grid; grid-template-columns: 1fr 1fr; background: white; min-height: 380px; }
+    .skel-hero-img  { background: #EEE8DF; animation: shimmer 1.4s infinite; }
+    .skel-hero-body { padding: 2.5rem; display: flex; flex-direction: column; gap: 1rem; justify-content: center; }
+    .skel-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.3rem; }
+    .skel-card { background: white; border-radius: 10px; overflow: hidden; }
+    .skel-img  { width: 100%; height: 190px; background: #EEE8DF; animation: shimmer 1.4s infinite; }
+    .skel-bd   { padding: 1rem 1.1rem; }
+    .skel-ln   { height: 12px; background: #EEE8DF; border-radius: 6px; margin-bottom: 9px; animation: shimmer 1.4s infinite; }
+    .skel-ttl  { height: 20px; background: #EEE8DF; border-radius: 6px; margin-bottom: 1.2rem; width: 180px; animation: shimmer 1.4s infinite; }
+    .empty-row { grid-column: 1/-1; text-align: center; padding: 3rem; background: white; border-radius: 10px; color: #7A6658; font-size: 0.9rem; }
+    @@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @@media (max-width: 1100px) { .act-grid, .skel-grid { grid-template-columns: repeat(2,1fr); } }
+    @@media (max-width: 900px)  { .featured-hero { grid-template-columns: 1fr; } .featured-hero-img { min-height: 240px; height: 240px; } }
+    @@media (max-width: 768px)  { .page-header { padding: 2rem 1.2rem 0; } .filter-strip { padding: 1.2rem; } .act-section-wrap { padding: 0 1.2rem 2rem; } .act-grid, .skel-grid { grid-template-columns: 1fr; } .featured-hero-body { padding: 1.5rem; } .skel-hero { grid-template-columns: 1fr; } .flow-hint { margin: 0 1.2rem; } .act-btn-row { grid-template-columns: 1fr; } }
+</style>
+
+<div class="activities-page">
+
+    <div class="page-header">
+        <h1>Activities &amp; Experiences</h1>
+        <p>Discover unforgettable adventures across Saudi Arabia</p>
+    </div>
+
+    <div class="flow-hint">
+        💡 <span>
+            Click <strong>Details &amp; Book</strong> to view full activity info and go straight to checkout.
+            Use <strong>Plan Trip</strong> to add the activity to a multi-day trip planner.
+        </span>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="skel-hero">
+            <div class="skel-hero-img"></div>
+            <div class="skel-hero-body">
+                <div class="skel-ln" style="width:55%"></div>
+                <div class="skel-ln" style="height:28px;width:80%"></div>
+                <div class="skel-ln"></div>
+                <div class="skel-ln" style="width:45%"></div>
+                <div class="skel-ln" style="height:36px;width:140px;margin-top:8px"></div>
+            </div>
+        </div>
+    }
+    else if (featuredActivity != null)
+    {
+        <div class="featured-hero">
+            <img class="featured-hero-img"
+                 src="@featuredActivity.ImageUrl"
+                 alt="@featuredActivity.Name"
+                 onerror="this.src='https://images.unsplash.com/photo-1616236197457-53e96373d0b0?w=900'" />
+            <div class="featured-hero-body">
+                <div class="featured-label">Featured Experience</div>
+                <h2>@featuredActivity.Name</h2>
+                <div class="feat-desc">@featuredActivity.Description</div>
+                <div class="featured-meta">
+                    <span class="meta-item">@GetDurationLabel(featuredActivity.DurationHours)</span>
+                    <span class="meta-dot"></span>
+                    <span class="meta-item">@GetDifficultyLabel(featuredActivity)</span>
+                    <span class="meta-dot"></span>
+                    <span class="meta-item">SAR @featuredActivity.PriceSAR</span>
+                </div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                    <a class="btn-explore-dest" href="/activity/@featuredActivity.Id">
+                        📖 Full Details &amp; Book →
+                    </a>
+                    <a class="btn-explore-dest" href="/planner?destinationId=@featuredActivity.DestinationId&activities=@featuredActivity.Id"
+                       style="background:transparent;border:2px solid #7B3121;color:#7B3121;">
+                        🗺️ Plan Trip
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="filter-strip">
+        <button class="filter-chip @(activeFilter == ""          ? "active" : "")" @onclick='() => SetFilter("")'>All</button>
+        <button class="filter-chip @(activeFilter == "Adventure" ? "active" : "")" @onclick='() => SetFilter("Adventure")'>Adventure</button>
+        <button class="filter-chip @(activeFilter == "Cultural"  ? "active" : "")" @onclick='() => SetFilter("Cultural")'>Cultural</button>
+        <button class="filter-chip @(activeFilter == "Water"     ? "active" : "")" @onclick='() => SetFilter("Water")'>Water Sports</button>
+        <button class="filter-chip @(activeFilter == "Desert"    ? "active" : "")" @onclick='() => SetFilter("Desert")'>Desert</button>
+    </div>
+
+    @if (isLoading)
+    {
+        @for (int idx = 0; idx < 2; idx++)
+        {
+            <div class="act-section-wrap">
+                <div class="skel-ttl"></div>
+                <div class="skel-grid">
+                    @for (int j = 0; j < 3; j++)
+                    {
+                        <div class="skel-card">
+                            <div class="skel-img"></div>
+                            <div class="skel-bd">
+                                <div class="skel-ln"></div>
+                                <div class="skel-ln" style="width:60%"></div>
+                                <div class="skel-ln" style="height:36px;margin-top:10px"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        @foreach (var grp in VisibleGroups)
+        {
+            <div class="act-section-wrap">
+                <h3 class="act-section-title">@(grp.Label == "Water" ? "Water Sports" : grp.Label) Activities</h3>
+                <div class="act-grid">
+                    @if (!grp.Items.Any())
+                    {
+                        <div class="empty-row">No activities in this category yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var act in grp.Items)
+                        {
+                            var a = act;
+                            <div class="act-card">
+                                <div class="act-img-wrap">
+                                    <img src="@a.ImageUrl" alt="@a.Name"
+                                         onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600'" />
+                                    <span class="diff-badge @GetDifficultyClass(a)">
+                                        @GetDifficultyLabel(a)
+                                    </span>
+                                </div>
+                                <div class="act-card-body">
+                                    <div class="act-card-name">@a.Name</div>
+                                    <p class="act-card-desc">@a.Description</p>
+                                    <div class="act-card-meta">
+                                        <span class="meta-item">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                                            </svg>
+                                            @GetDurationLabel(a.DurationHours)
+                                        </span>
+                                        <span class="meta-item" style="color:#7B3121;font-weight:600;">
+                                            SAR @a.PriceSAR
+                                        </span>
+                                    </div>
+                                    <div class="act-btn-row">
+                                        <a href="/activity/@a.Id"
+                                           class="btn-details-primary"
+                                           aria-label="View details and book @a.Name">
+                                            📖 Details &amp; Book
+                                        </a>
+                                        <a href="/planner?destinationId=@a.DestinationId&activities=@a.Id"
+                                           class="btn-plan"
+                                           aria-label="Plan trip with @a.Name">
+                                            🗺️ Plan Trip
+                                        </a>
+                                    </div>
+
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private class ActivityGroup
+    {
+        public string         Label { get; init; } = "";
+        public List<Activity> Items { get; init; } = new();
+    }
+
+    private static readonly List<string> SectionOrder =
+        new() { "Adventure", "Cultural", "Water", "Desert" };
+
+    private List<Activity> allActivities    = new();
+    private Activity?      featuredActivity = null;
+    private bool           isLoading        = true;
+    private string         activeFilter     = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // FIX: Single GetAllAsync() call instead of 18 parallel per-destination calls.
+            // This is one DB query vs 18. Requires ActivityService.GetAllAsync() on the backend
+            // (SELECT * FROM Activities — simple, fast, cacheable).
+            allActivities = (await ActivityService.GetAllAsync()).ToList();
+
+            featuredActivity =
+                allActivities.FirstOrDefault(a =>
+                    a.Category.Equals("Adventure", StringComparison.OrdinalIgnoreCase))
+                ?? allActivities.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Activities] Load error: {ex.Message}");
+            allActivities    = StaticFallback();
+            featuredActivity = allActivities.FirstOrDefault(a => a.Category == "Adventure");
+        }
+
+        isLoading = false;
+    }
+
+    private void SetFilter(string cat) => activeFilter = cat;
+
+    private IEnumerable<ActivityGroup> VisibleGroups
+    {
+        get
+        {
+            var cats = string.IsNullOrEmpty(activeFilter)
+                ? SectionOrder
+                : new List<string> { activeFilter };
+
+            foreach (var cat in cats)
+            {
+                var items = allActivities
+                    .Where(a => a.Category.Equals(cat, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (items.Any())
+                    yield return new ActivityGroup { Label = cat, Items = items };
+            }
+        }
+    }
+
+    private static string GetDurationLabel(decimal hours) => hours switch
+    {
+        <= 0M => "Half day", <= 2M => "2-3 hours", <= 3M => "3-4 hours",
+        <= 4M => "4-5 hours", <= 5M => "4-6 hours", >= 8M => "Full day",
+        _     => $"{hours:0} hours"
+    };
+
+    // Use actual DifficultyLevel from DB (Easy / Moderate / Challenging)
+    // Fall back to category-based guess only if field is blank
+    private static string GetDifficultyLabel(Activity a)
+    {
+        if (!string.IsNullOrWhiteSpace(a.DifficultyLevel)) return a.DifficultyLevel;
+        return a.Category.ToLower() switch
+        {
+            "adventure" => "Moderate", "water" => "Moderate", _ => "Easy"
+        };
+    }
+
+    private static string GetDifficultyClass(Activity a)
+    {
+        var level = string.IsNullOrWhiteSpace(a.DifficultyLevel)
+            ? (a.Category.ToLower() switch { "adventure" => "moderate", "water" => "moderate", _ => "easy" })
+            : a.DifficultyLevel.ToLower();
+        return level switch
+        {
+            "challenging" => "challenging",
+            "moderate"    => "moderate",
+            _             => "easy"
+        };
+    }
+
+    private static List<Activity> StaticFallback() => new()
+    {
+        new Activity { Id=1,  Name="AlUla Heritage & Adventure Combo", Category="Adventure", DurationHours=8M, PriceSAR=350, DestinationId=3, Description="Experience the best of AlUla — archaeological tours, desert adventures, and cultural immersion.", ImageUrl="https://images.unsplash.com/photo-1616236197457-53e96373d0b0?w=900" },
+        new Activity { Id=2,  Name="Desert Safari",                    Category="Adventure", DurationHours=5M, PriceSAR=150, DestinationId=7, Description="Thrilling off-road adventure through vast golden dunes with expert guides.",                        ImageUrl="https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=700" },
+        new Activity { Id=3,  Name="Rock Climbing",                    Category="Adventure", DurationHours=3M, PriceSAR=120, DestinationId=8, Description="Scale spectacular sandstone formations with certified climbing instructors.",                        ImageUrl="https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=700" },
+        new Activity { Id=4,  Name="Dune Bashing",                     Category="Adventure", DurationHours=2M, PriceSAR=100, DestinationId=7, Description="Heart-pumping 4×4 ride across towering dunes in the vast Empty Quarter.",                          ImageUrl="https://images.unsplash.com/photo-1542401886-65d6c61db217?w=700" },
+        new Activity { Id=5,  Name="Heritage Walking Tour",            Category="Cultural",  DurationHours=3M, PriceSAR=90,  DestinationId=4, Description="Guided walk through Diriyah's ancient mud-brick district with a local historian.",                  ImageUrl="https://images.unsplash.com/photo-1539667284076-a4d98d9ac42b?w=700" },
+        new Activity { Id=6,  Name="Traditional Souq Experience",      Category="Cultural",  DurationHours=2M, PriceSAR=70,  DestinationId=2, Description="Explore labyrinthine souqs, taste local spices, and shop handcrafted treasures.",                    ImageUrl="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=700" },
+        new Activity { Id=7,  Name="Archaeological Site Visit",        Category="Cultural",  DurationHours=4M, PriceSAR=110, DestinationId=3, Description="Walk among Nabataean tombs and inscriptions at AlUla's UNESCO sites.",                              ImageUrl="https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=700" },
+        new Activity { Id=8,  Name="Scuba Diving",                     Category="Water",     DurationHours=0M, PriceSAR=200, DestinationId=12,Description="Dive into pristine Red Sea coral reefs teeming with vibrant marine life.",                           ImageUrl="https://images.unsplash.com/photo-1564769611905-cd27ee64e59b?w=700" },
+        new Activity { Id=9,  Name="Snorkeling Adventure",             Category="Water",     DurationHours=3M, PriceSAR=90,  DestinationId=12,Description="Snorkel through crystal-clear waters above spectacular coral gardens.",                              ImageUrl="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=700" },
+        new Activity { Id=10, Name="Camel Trekking",                   Category="Desert",    DurationHours=2M, PriceSAR=100, DestinationId=7, Description="Ride through golden sands atop a camel as the dunes glow crimson at sunset.",                        ImageUrl="https://images.unsplash.com/photo-1549880338-65ddcdfd017b?w=700" },
+        new Activity { Id=11, Name="Stargazing Experience",            Category="Desert",    DurationHours=2M, PriceSAR=80,  DestinationId=9, Description="Witness a breathtaking canopy of stars deep in the Arabian desert.",                                 ImageUrl="https://images.unsplash.com/photo-1446941303997-2843d7b4d20f?w=700" },
+        new Activity { Id=12, Name="Bedouin Camp Experience",          Category="Desert",    DurationHours=8M, PriceSAR=180, DestinationId=9, Description="Spend an evening in a traditional Bedouin camp with dinner, music, and tales.",                       ImageUrl="https://images.unsplash.com/photo-1519671282429-b44b0de7773e?w=700" },
+    };
+}

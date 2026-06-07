@@ -1,0 +1,958 @@
+@page "/planner"
+@layout DunesOfArabia.Components.Layout.MainLayout
+@rendermode InteractiveServer
+
+@inject IDestinationService  DestinationService
+@inject IActivityService     ActivityService
+@inject IItineraryService    ItineraryService
+@inject NavigationManager    Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Configuration
+@inject IHttpClientFactory HttpClientFactory
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.WebUtilities
+
+<PageTitle>Trip Planner – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@@400;600;700&family=Lato:wght@@300;400;500;600&display=swap');
+    .planner-page { background: #F5EFE8; min-height: 100vh; font-family: 'Lato', sans-serif; padding-bottom: 4rem; }
+    .planner-header { text-align: center; padding: 2.5rem 2rem 1.5rem; }
+    .planner-header h1 { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(2rem, 4vw, 2.8rem); color: #1C1008; font-weight: 700; margin-bottom: 0.4rem; }
+    .planner-header p { font-size: 0.9rem; color: #8A7566; font-weight: 300; }
+    .breadcrumb { display: flex; align-items: center; gap: 0.5rem; padding: 0 2rem 1rem; max-width: 900px; margin: 0 auto; font-size: 0.82rem; color: #9A8878; flex-wrap: wrap; }
+    .breadcrumb a { color: #7B3121; text-decoration: none; font-weight: 600; }
+    .breadcrumb-sep { color: #C4A090; }
+    .steps-bar { display: grid; grid-template-columns: repeat(4, 1fr); max-width: 760px; margin: 0 auto 2rem; padding: 0 2rem; }
+    .step-item { display: flex; flex-direction: column; align-items: flex-start; }
+    .step-label { font-size: 0.78rem; font-weight: 500; color: #B0A090; margin-bottom: 0.4rem; }
+    .step-label.active { color: #1C1008; font-weight: 600; }
+    .step-label.done   { color: #7B3121; font-weight: 600; }
+    .step-track { height: 3px; width: 100%; background: #E0D5CA; border-radius: 2px; overflow: hidden; }
+    .step-fill { height: 100%; background: #7B3121; border-radius: 2px; transition: width 0.35s ease; }
+    .step-card { background: white; border-radius: 14px; padding: 2rem 2.2rem 2.2rem; max-width: 900px; margin: 0 auto; box-shadow: 0 2px 14px rgba(90,55,35,0.07); }
+    .step-card h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.45rem; color: #1C1008; font-weight: 700; margin-bottom: 0.3rem; }
+    .step-sub { font-size: 0.84rem; color: #9A8878; font-weight: 300; margin-bottom: 1.6rem; }
+    .plans-intro { background: #FFF8DC; border: 1.5px solid #C8873A; border-radius: 8px; padding: 0.9rem 1.2rem; margin-bottom: 1.5rem; font-size: 0.86rem; color: #5C3D00; }
+    .plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.2rem; margin-bottom: 1.5rem; }
+    .plan-card { border: 2px solid #E0D5CA; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; background: white; }
+    .plan-card:hover { border-color: #C8873A; box-shadow: 0 4px 14px rgba(200,135,58,0.15); transform: translateY(-2px); }
+    .plan-card.selected { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.18); }
+    .plan-card-img { height: 130px; width: 100%; object-fit: cover; display: block; }
+    .plan-card-body { padding: 1rem 1.1rem 1.2rem; }
+    .plan-card-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .badge-budget { background: #D4F5E2; color: #1A6A3A; }
+    .badge-standard { background: #FFF3CC; color: #7A5A00; }
+    .badge-luxury { background: #F5EAF9; color: #7A1A9A; }
+    .badge-adventure { background: #FFE0DC; color: #7A2010; }
+    .badge-family { background: #E8F4FD; color: #1A4E78; }
+    .badge-cultural { background: #FAF0E8; color: #7B3121; }
+    .plan-card-name { font-family: 'Playfair Display', Georgia, serif; font-size: 1rem; color: #1C1008; font-weight: 700; margin-bottom: 0.4rem; }
+    .plan-card-meta { display: flex; gap: 0.75rem; font-size: 0.78rem; color: #7A6658; margin-bottom: 0.6rem; }
+    .plan-card-desc { font-size: 0.8rem; color: #666; line-height: 1.5; margin-bottom: 0.75rem; }
+    .plan-card-price { font-size: 0.92rem; font-weight: 700; color: #7B3121; }
+    .plan-selected-tick { background: #7B3121; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; margin-left: 0.5rem; vertical-align: middle; }
+
+    /* ── AI Suggestion section ── */
+    .ai-section { background: linear-gradient(135deg, #1C1008 0%, #3A1F10 100%); border-radius: 12px; padding: 1.5rem 1.6rem; margin-bottom: 1.5rem; color: white; }
+    .ai-section h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; color: white; }
+    .ai-section p { font-size: 0.84rem; color: rgba(255,255,255,0.75); margin-bottom: 1rem; }
+    .ai-textarea { width: 100%; padding: 10px 14px; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 8px; font-family: inherit; font-size: 0.87rem; resize: vertical; min-height: 80px; background: rgba(255,255,255,0.08); color: white; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
+    .ai-textarea::placeholder { color: rgba(255,255,255,0.45); }
+    .ai-textarea:focus { border-color: #C8873A; }
+    .btn-ai { display: inline-flex; align-items: center; gap: 7px; padding: 10px 22px; background: #C8873A; color: white; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s; margin-top: 0.75rem; }
+    .btn-ai:hover:not(:disabled) { background: #A56A28; }
+    .btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
+    .ai-result { margin-top: 1rem; padding: 0.85rem 1rem; background: rgba(200,135,58,0.15); border-radius: 8px; border-left: 3px solid #C8873A; font-size: 0.86rem; color: rgba(255,255,255,0.9); line-height: 1.6; }
+    .ai-error { background: rgba(200,50,50,0.15); border-left-color: #E88A90; color: rgba(255,200,200,0.9); }
+
+    /* ── MCDM ── */
+    .mcdm-section { background: #F5EFE8; border: 1.5px solid #C4A090; border-radius: 10px; padding: 1.4rem 1.5rem; margin-bottom: 1.5rem; }
+    .mcdm-section h3 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.1rem; color: #1C1008; margin-bottom: 0.3rem; }
+    .mcdm-section p { font-size: 0.84rem; color: #7A6658; margin-bottom: 1.2rem; }
+    .mcdm-criteria { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+    .mcdm-criterion { display: flex; flex-direction: column; gap: 0.35rem; }
+    .mcdm-criterion label { font-size: 0.82rem; font-weight: 600; color: #3A2A1E; }
+    .mcdm-slider { width: 100%; accent-color: #7B3121; }
+    .mcdm-value { font-size: 0.76rem; color: #7B3121; font-weight: 600; text-align: right; }
+    .btn-mcdm { display: flex; align-items: center; gap: 7px; padding: 10px 22px; background: #7B3121; color: white; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s; margin-top: 1.2rem; }
+    .btn-mcdm:hover { background: #5C2218; }
+    .mcdm-result { margin-top: 1rem; padding: 0.85rem 1rem; background: white; border-radius: 8px; border-left: 4px solid #C8873A; font-size: 0.86rem; color: #444; }
+
+    /* ── Step 2 form ── */
+    .form-field { margin-bottom: 1.2rem; }
+    .form-field label { display: block; font-size: 0.84rem; font-weight: 600; color: #3A2A1E; margin-bottom: 0.4rem; }
+    .form-select, .form-input { width: 100%; padding: 11px 14px; border: 1.5px solid #DDD3C8; border-radius: 8px; font-size: 0.88rem; font-family: inherit; background: white; color: #2E1A0E; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+    .form-select:focus, .form-input:focus { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.08); }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .number-wrap { display: flex; align-items: center; gap: 0; width: fit-content; }
+    .num-btn { width: 36px; height: 38px; border: 1.5px solid #DDD3C8; background: white; color: #3A2A1E; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; font-family: inherit; }
+    .num-btn:first-child { border-radius: 8px 0 0 8px; }
+    .num-btn:last-child  { border-radius: 0 8px 8px 0; }
+    .num-btn:hover { background: #FAF0E8; border-color: #C4A090; }
+    .num-display { min-width: 52px; height: 38px; border-top: 1.5px solid #DDD3C8; border-bottom: 1.5px solid #DDD3C8; border-left: none; border-right: none; display: flex; align-items: center; justify-content: center; font-size: 0.92rem; font-weight: 600; color: #2E1A0E; background: white; }
+    .budget-range { display: flex; align-items: center; gap: 1rem; }
+    .budget-range input[type=range] { flex: 1; accent-color: #7B3121; }
+    .budget-display { font-weight: 700; color: #7B3121; white-space: nowrap; min-width: 100px; }
+
+    /* ── Activities grid in step 2 ── */
+    .activities-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+    .activities-count-badge { font-size: 0.8rem; color: #9A8878; }
+    .act-grid-step2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .act-card-step2 { border: 2px solid #DDD3C8; border-radius: 10px; overflow: hidden; background: white; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+    .act-card-step2:hover { border-color: #C8873A; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+    .act-card-step2.sel { border-color: #2E7D32; box-shadow: 0 0 0 3px rgba(46,125,50,0.12); }
+    .act-img-step2 { position: relative; height: 130px; overflow: hidden; }
+    .act-img-step2 img { width: 100%; height: 100%; object-fit: cover; }
+    .act-tick { position: absolute; top: 8px; left: 8px; background: #2E7D32; color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; }
+    .act-diff-badge { position: absolute; top: 8px; right: 8px; background: #C8873A; color: white; padding: 2px 9px; border-radius: 20px; font-size: 0.71rem; font-weight: 600; }
+    .act-body-step2 { padding: 0.85rem 1rem; }
+    .act-name-step2 { font-family: 'Playfair Display', Georgia, serif; font-size: 0.95rem; color: #1C1008; font-weight: 700; margin-bottom: 0.3rem; }
+    .act-desc-step2 { font-size: 0.79rem; color: #7A6658; margin: 0 0 0.6rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .act-footer-step2 { display: flex; justify-content: space-between; font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; }
+    .act-price-step2 { color: #7B3121; font-weight: 600; }
+    .act-toggle-btn { display: block; width: 100%; padding: 6px; text-align: center; border-radius: 6px; font-size: 0.8rem; font-weight: 600; font-family: inherit; cursor: pointer; border: none; transition: all 0.18s; }
+    .act-toggle-btn.add { background: #C8873A; color: white; }
+    .act-toggle-btn.remove { background: white; color: #B03020; border: 1.5px solid #B03020; }
+    .sel-summary-bar { background: linear-gradient(135deg, #7B3121, #9B4535); border-radius: 10px; padding: 1rem 1.4rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; color: white; }
+    .sel-summary-bar strong { display: block; }
+    .sel-summary-bar span { font-size: 0.83rem; opacity: 0.85; }
+
+    /* ── Transport ── */
+    .transport-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.2rem; margin-bottom: 1.5rem; }
+    .transport-option { border: 2px solid #DDD3C8; border-radius: 10px; padding: 1.2rem 1.3rem; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; background: white; }
+    .transport-option:hover { border-color: #C8873A; }
+    .transport-option.selected { border-color: #7B3121; box-shadow: 0 0 0 3px rgba(123,49,33,0.12); background: #FDF9F5; }
+    .transport-option-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .transport-icon { width: 40px; height: 40px; background: #F5EFE8; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .transport-option-name { font-weight: 700; color: #1C1008; font-size: 0.95rem; }
+    .transport-option-price { font-size: 0.78rem; color: #C8873A; font-weight: 600; }
+    .transport-option-desc { font-size: 0.82rem; color: #666; line-height: 1.5; margin-bottom: 0.75rem; }
+    .transport-link { font-size: 0.78rem; color: #7B3121; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+    .transport-link:hover { text-decoration: underline; }
+    .no-transport { border: 2px solid #DDD3C8; border-radius: 10px; padding: 1rem 1.3rem; cursor: pointer; font-size: 0.86rem; color: #7A6658; background: white; text-align: center; transition: border-color 0.2s; }
+    .no-transport.selected { border-color: #7B3121; background: #FDF9F5; }
+    .no-transport:hover { border-color: #C8873A; }
+
+    /* ── Summary ── */
+    .summary-row { display: flex; align-items: flex-start; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #F0E8DC; }
+    .summary-row:last-of-type { border-bottom: none; }
+    .summary-icon { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #7B3121; }
+    .summary-label { font-size: 0.88rem; font-weight: 600; color: #1C1008; margin-bottom: 0.2rem; }
+    .summary-value { font-size: 0.84rem; color: #7A6658; font-weight: 300; }
+    .cost-breakdown { background: #F5EFE8; border-radius: 10px; padding: 1.2rem 1.4rem; margin-top: 1rem; }
+    .cost-line { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.88rem; color: #666; border-bottom: 1px solid #EAE0D8; }
+    .cost-line:last-child { border-bottom: none; }
+    .cost-line.total { font-weight: 700; color: #7B3121; font-size: 1rem; margin-top: 0.25rem; padding-top: 0.6rem; border-top: 2px solid #7B3121; border-bottom: none; }
+    .summary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1.5rem; }
+    .btn-action { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s, transform 0.15s; border: none; }
+    .btn-action.primary { background: #7B3121; color: white; }
+    .btn-action.primary:hover { background: #5C2218; transform: translateY(-1px); }
+    .btn-action.outline { background: white; color: #3A2A1E; border: 1.5px solid #C4A090; }
+    .btn-action.outline:hover { background: #FAF0E8; border-color: #7B3121; }
+    .btn-action.proceed { background: #C8873A; color: white; grid-column: 1 / -1; padding: 14px; font-size: 1rem; }
+    .btn-action.proceed:hover { background: #A56A28; }
+
+    /* ── Nav buttons ── */
+    .planner-nav { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 1.6rem auto 0; padding: 0 2rem; }
+    .btn-prev { display: flex; align-items: center; gap: 6px; padding: 11px 22px; border: 1.5px solid #C4A090; border-radius: 7px; background: white; color: #5A3A2A; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.18s; }
+    .btn-prev:hover { background: #FAF0E8; border-color: #7B3121; }
+    .btn-prev:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-next { display: flex; align-items: center; gap: 6px; padding: 11px 26px; background: #7B3121; color: white; border: none; border-radius: 7px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s, transform 0.15s; }
+    .btn-next:hover { background: #5C2218; transform: translateY(-1px); }
+
+    @@media (max-width: 768px) { .step-card { margin: 0 1rem; padding: 1.5rem; } .planner-nav { padding: 0 1rem; } .date-row { grid-template-columns: 1fr; } .summary-actions { grid-template-columns: 1fr; } .steps-bar { padding: 0 1rem; } .mcdm-criteria { grid-template-columns: 1fr 1fr; } .plans-grid, .act-grid-step2, .transport-options { grid-template-columns: 1fr; } }
+</style>
+
+<div class="planner-page">
+
+    <div class="planner-header">
+        <h1>@(incomingDestinationId > 0 ? $"Plan Your Trip to {incomingDestinationName}" : "Plan Your Saudi Adventure")</h1>
+        <p>Choose a pre-built plan or customize your own itinerary</p>
+    </div>
+
+    @if (incomingDestinationId > 0)
+    {
+        <div class="breadcrumb">
+            <a href="/destinations">Destinations</a>
+            <span class="breadcrumb-sep">›</span>
+            <a href="/destination/@incomingDestinationId">@incomingDestinationName</a>
+            <span class="breadcrumb-sep">›</span>
+            <span>Trip Planner</span>
+        </div>
+    }
+
+    <!-- Steps progress bar -->
+    <div class="steps-bar">
+        @for (int i = 1; i <= 4; i++)
+        {
+            var stepNum = i;
+            var labelClass = currentStep == stepNum ? "active" : currentStep > stepNum ? "done" : "";
+            var fillPct = currentStep > stepNum ? "100%" : currentStep == stepNum ? "50%" : "0%";
+            <div class="step-item">
+                <span class="step-label @labelClass">
+                    @(stepNum switch { 1 => "Choose Plan", 2 => "Customize", 3 => "Transport", 4 => "Summary", _ => "" })
+                </span>
+                <div class="step-track"><div class="step-fill" style="width: @fillPct"></div></div>
+            </div>
+        }
+    </div>
+
+    <!-- ══════════ STEP 1 ══════════ -->
+    @if (currentStep == 1)
+    {
+        <div class="step-card">
+            <h2>Choose a Trip Plan</h2>
+            <p class="step-sub">Select a pre-built package or use AI / Smart Match to find the best one for you.</p>
+
+            <div class="plans-intro">💡 Select a plan below as your starting point. You can customize dates, activities and transport in the next steps.</div>
+
+            <div class="plans-grid">
+                @foreach (var plan in prebuiltPlans)
+                {
+                    var p = plan;
+                    var isExpanded = expandedPlanIds.Contains(p.Id);
+                    <div class="plan-card @(selectedPlanId == p.Id ? "selected" : "")" @onclick="() => SelectPlan(p)">
+                        <img class="plan-card-img" src="@p.ImageUrl" alt="@p.Name"
+                             onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600'" />
+                        <div class="plan-card-body">
+                            <span class="plan-card-badge @p.BadgeClass">@p.Category</span>
+                            <div class="plan-card-name">
+                                @p.Name
+                                @if (selectedPlanId == p.Id) { <span class="plan-selected-tick">✓</span> }
+                            </div>
+                            <div class="plan-card-meta"><span>📅 @p.Days days</span><span>👥 @p.Travelers</span></div>
+                            <div style="display:flex;flex-wrap:wrap;gap:4px;margin:0.5rem 0 0.6rem;">
+                                <span style="font-size:0.72rem;background:#F5EFE8;border:1px solid #DDD3C8;border-radius:4px;padding:2px 7px;color:#5A3A2A;">🏨 @p.HotelTier</span>
+                                <span style="font-size:0.72rem;background:#F5EFE8;border:1px solid #DDD3C8;border-radius:4px;padding:2px 7px;color:#5A3A2A;">🎯 @p.ActivitiesIncluded activities</span>
+                                @if (p.MealsIncluded)     { <span style="font-size:0.72rem;background:#F5EFE8;border:1px solid #DDD3C8;border-radius:4px;padding:2px 7px;color:#5A3A2A;">🍽️ Meals</span> }
+                                @if (p.TransportIncluded) { <span style="font-size:0.72rem;background:#F5EFE8;border:1px solid #DDD3C8;border-radius:4px;padding:2px 7px;color:#5A3A2A;">🚌 Transport</span> }
+                            </div>
+                            <p class="plan-card-desc">@p.Description</p>
+                            @if (p.DayByDay.Any())
+                            {
+                                <button style="background:none;border:none;color:#7B3121;font-size:0.78rem;font-weight:600;cursor:pointer;padding:0;font-family:inherit;margin-bottom:0.5rem;"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => { if (expandedPlanIds.Contains(p.Id)) expandedPlanIds.Remove(p.Id); else expandedPlanIds.Add(p.Id); }">
+                                    @(isExpanded ? "▲ Hide itinerary" : "▼ View day-by-day")
+                                </button>
+                                @if (isExpanded)
+                                {
+                                    <ul style="margin:0 0 0.5rem 0;padding:0;list-style:none;">
+                                        @foreach (var day in p.DayByDay)
+                                        {
+                                            <li style="font-size:0.75rem;color:#5A3A2A;padding:3px 0;border-bottom:1px solid #F0E8DC;">@day</li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                            <div class="plan-card-price">SR @p.BasePrice.ToString("N0") <small style="font-weight:400;color:#9A8878;">/ person</small></div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- ── AI Trip Recommendation (FIXED — actually calls Claude API) ── -->
+            <div class="ai-section">
+                <h3>✨ Tell Claude AI About Your Dream Trip</h3>
+                <p style="font-size:0.84rem;color:rgba(255,255,255,0.75);margin-bottom:1rem;">
+                    Use natural language — mention who you're travelling with, what you enjoy, any special needs,
+                    your rough budget, and how many days. AI will read between the lines and pick the right plan.
+                    <em style="opacity:0.6;">Best for: first-time users, complex preferences, families with specific needs.</em>
+                </p>
+                <textarea class="ai-textarea"
+                          placeholder="e.g. I want a 5-day cultural trip to AlUla for 2 people, moderate budget around SR 3000 per person, we love history and photography but prefer not too much walking..."
+                          @bind="aiPromptText"
+                          @bind:event="oninput"></textarea>
+                <button class="btn-ai" @onclick="RunAiSuggestion" disabled="@(aiLoading || string.IsNullOrWhiteSpace(aiPromptText))">
+                    @if (aiLoading)
+                    {
+                        <span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                        <span>Getting recommendation…</span>
+                    }
+                    else
+                    {
+                        <span>✨ Get AI Recommendation</span>
+                    }
+                </button>
+                @if (!string.IsNullOrEmpty(aiResult))
+                {
+                    <div class="ai-result @(aiIsError ? "ai-error" : "")">
+                        @aiResult
+                        @if (selectedPlan != null && !aiIsError)
+                        {
+                            <strong> → "@selectedPlan.Name" selected.</strong>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- ── MCDM Sliders ── -->
+            <div class="mcdm-section">
+                <h3>🎛️ Smart Score (Multi-Criteria Matching)</h3>
+                <p style="font-size:0.84rem;color:#7A6658;margin-bottom:1rem;">
+                    Rate each factor from 1–5. Our TOPSIS algorithm calculates the Euclidean distance between
+                    your preference vector and each plan's weight vector — then ranks all 6 plans by score.
+                    <em style="color:#9A8878;">Best for: analytical users who know their priorities.</em>
+                </p>
+                <div class="mcdm-criteria">
+                    <div class="mcdm-criterion"><label>💰 Budget Priority</label><input type="range" class="mcdm-slider" min="1" max="5" @bind="mcdmBudget" /><span class="mcdm-value">@McdmLabel(mcdmBudget)</span></div>
+                    <div class="mcdm-criterion"><label>🏔️ Adventure Level</label><input type="range" class="mcdm-slider" min="1" max="5" @bind="mcdmAdventure" /><span class="mcdm-value">@McdmLabel(mcdmAdventure)</span></div>
+                    <div class="mcdm-criterion"><label>🏛️ Cultural Interest</label><input type="range" class="mcdm-slider" min="1" max="5" @bind="mcdmCulture" /><span class="mcdm-value">@McdmLabel(mcdmCulture)</span></div>
+                    <div class="mcdm-criterion"><label>👨‍👩‍👧 Family Friendly</label><input type="range" class="mcdm-slider" min="1" max="5" @bind="mcdmFamily" /><span class="mcdm-value">@McdmLabel(mcdmFamily)</span></div>
+                    <div class="mcdm-criterion"><label>🛁 Luxury Comfort</label><input type="range" class="mcdm-slider" min="1" max="5" @bind="mcdmLuxury" /><span class="mcdm-value">@McdmLabel(mcdmLuxury)</span></div>
+                </div>
+                <button class="btn-mcdm" @onclick="RunMcdmMatch">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    Find My Best Match
+                </button>
+                @if (mcdmRanking.Any())
+                {
+                    <div class="mcdm-result" style="padding:0;">
+                        <div style="font-weight:600;color:#5C3D00;margin-bottom:0.6rem;padding:0.85rem 1rem 0;">
+                            📊 All Plans Ranked by Your Criteria:
+                        </div>
+                        @for (int i = 0; i < mcdmRanking.Count; i++)
+                        {
+                            var rank = mcdmRanking[i];
+                            var ri = i;
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;border-top:1px solid #EAD9C8;font-size:0.84rem;">
+                                <span>@(ri+1). @rank.Name <span style="font-size:0.75rem;color:#9A8878;">(distance: @rank.Score.ToString("F2"))</span></span>
+                                @if (ri == 0) { <span style="background:#7B3121;color:white;padding:2px 10px;border-radius:20px;font-size:0.7rem;font-weight:700;">Best Match ✓</span> }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ══════════ STEP 2 ══════════ -->
+    @if (currentStep == 2)
+    {
+        <div class="step-card">
+            <h2>Customize Your Plan</h2>
+            <p class="step-sub">Adjusting: <strong>@(selectedPlan?.Name ?? "Custom Plan")</strong></p>
+
+            <div class="form-field">
+                <label>📍 Destination</label>
+                <select class="form-select" @bind="selectedDestinationId" @bind:after="LoadDestinationActivitiesAsync">
+                    <option value="0">Select destination</option>
+                    @foreach (var d in allDestinations)
+                    {
+                        <option value="@d.Id">@d.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="date-row">
+                <div class="form-field"><label>📅 Start Date</label><input class="form-input" type="date" @bind="startDate" @bind:format="yyyy-MM-dd" /></div>
+                <div class="form-field"><label>📅 End Date</label><input class="form-input" type="date" @bind="endDate" @bind:format="yyyy-MM-dd" /></div>
+            </div>
+
+            <div class="form-field">
+                <label>🧳 Trip Type</label>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+                    @foreach (var t in new[] { "Solo", "Couple", "Family", "Group" })
+                    {
+                        var type = t;
+                        <button style="padding:8px 18px;border-radius:6px;font-family:inherit;font-size:0.86rem;font-weight:600;cursor:pointer;border:1.5px solid @(tripType == type ? "#7B3121" : "#C4A090");background:@(tripType == type ? "#7B3121" : "white");color:@(tripType == type ? "white" : "#5A3A2A");transition:all 0.18s;"
+                                @onclick="() => SetTripType(type)">@type</button>
+                    }
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label>👥 Number of Travelers</label>
+                <div class="number-wrap">
+                    <button class="num-btn" @onclick="DecrementTravelers" disabled="@(tripType == "Solo" || (tripType == "Couple" && numTravelers <= 2))">−</button>
+                    <div class="num-display">@numTravelers</div>
+                    <button class="num-btn" @onclick="IncrementTravelers" disabled="@(tripType == "Solo" || (tripType == "Couple" && numTravelers >= 2))">+</button>
+                </div>
+                @if (tripType == "Solo") { <small style="color:#9A8878;font-size:0.78rem;">Solo trips are for 1 traveler.</small> }
+            </div>
+
+            <div class="form-field">
+                <label>💰 Budget per Person (SAR)</label>
+                <div class="budget-range">
+                    <input type="range" min="500" max="10000" step="100" @bind="budgetPerPerson" />
+                    <span class="budget-display">SR @budgetPerPerson.ToString("N0")</span>
+                </div>
+            </div>
+
+            <!-- ── DESTINATION ACTIVITIES (dynamic — loaded from DB) ── -->
+            <div class="form-field" style="margin-top:1.5rem;">
+                <div class="activities-section-header">
+                    <label style="font-size:0.95rem;margin:0;">
+                        🎯 Activities in @(allDestinations.FirstOrDefault(d => d.Id == selectedDestinationId)?.Name ?? "Your Destination")
+                    </label>
+                    @if (destinationActivities.Any())
+                    {
+                        <span class="activities-count-badge">@destinationActivities.Count @(destinationActivities.Count == 1 ? "activity" : "activities") available</span>
+                    }
+                </div>
+
+                @if (activitiesLoading)
+                {
+                    <p style="color:#9A8878;font-size:0.85rem;padding:1rem 0;">Loading activities…</p>
+                }
+                else if (selectedDestinationId <= 0)
+                {
+                    <p style="color:#9A8878;font-size:0.85rem;padding:0.5rem 0;">Select a destination above to see its specific activities.</p>
+                }
+                else if (!destinationActivities.Any())
+                {
+                    <div style="background:#FFF8DC;border:1.5px solid #C8873A;border-radius:8px;padding:0.85rem 1rem;font-size:0.84rem;color:#5C3D00;">
+                        ℹ️ No activities have been added for this destination yet. Continue to the next step.
+                    </div>
+                }
+                else
+                {
+                    <div style="background:#FFF8DC;border:1.5px solid #C8873A;border-radius:8px;padding:0.75rem 1rem;font-size:0.83rem;color:#5C3D00;margin-bottom:1rem;">
+                        ℹ️ These are the real activities available at this destination. Select any you'd like to include.
+                    </div>
+                    <div class="act-grid-step2">
+                        @foreach (var activity in destinationActivities)
+                        {
+                            var act = activity;
+                            var isSel = step2SelectedActivityIds.Contains(act.Id);
+                            <div class="act-card-step2 @(isSel ? "sel" : "")" @onclick="() => ToggleStep2Activity(act)">
+                                <div class="act-img-step2">
+                                    <img src="@act.ImageUrl" alt="@act.Name"
+                                         onerror="this.src='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400'" />
+                                    @if (isSel) { <span class="act-tick">✓</span> }
+                                    <span class="act-diff-badge">@act.DifficultyLevel</span>
+                                </div>
+                                <div class="act-body-step2">
+                                    <div class="act-name-step2">@act.Name</div>
+                                    <p class="act-desc-step2">@act.Description</p>
+                                    <div class="act-footer-step2">
+                                        <span>⏱️ @act.Duration mins</span>
+                                        <span class="act-price-step2">SR @act.Price.ToString("N0")</span>
+                                    </div>
+                                    <button class="act-toggle-btn @(isSel ? "remove" : "add")"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => ToggleStep2Activity(act)">
+                                        @(isSel ? "✓ Remove" : "+ Add Activity")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (step2SelectedActivities.Any())
+                    {
+                        <div class="sel-summary-bar">
+                            <div>
+                                <strong>@step2SelectedActivities.Count @(step2SelectedActivities.Count == 1 ? "activity" : "activities") selected</strong>
+                                <span>Total: SR @step2SelectedActivities.Sum(a => a.Price).ToString("N0") × @numTravelers pax = SR @(step2SelectedActivities.Sum(a => a.Price) * numTravelers).ToString("N0")</span>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ══════════ STEP 3 ══════════ -->
+    @if (currentStep == 3)
+    {
+        <div class="step-card">
+            <h2>🚌 Choose Transport</h2>
+            <p class="step-sub">Would you like transport arranged to @(allDestinations.FirstOrDefault(d => d.Id == selectedDestinationId)?.Name ?? "your destination")?</p>
+
+            <div class="transport-options">
+                <div class="transport-option @(selectedTransport == "saptco" ? "selected" : "")" @onclick='() => selectedTransport = "saptco"'>
+                    <div class="transport-option-header"><div class="transport-icon">🚌</div><div><div class="transport-option-name">SAPTCO Bus</div><div class="transport-option-price">~SR 80–200 / person</div></div></div>
+                    <p class="transport-option-desc">Saudi Public Transport Company — affordable intercity bus routes covering all major Saudi cities.</p>
+                    <a href="https://www.saptco.com.sa" target="_blank" rel="noopener" class="transport-link">View routes on SAPTCO.com.sa ↗</a>
+                </div>
+                <div class="transport-option @(selectedTransport == "careem" ? "selected" : "")" @onclick='() => selectedTransport = "careem"'>
+                    <div class="transport-option-header"><div class="transport-icon">🚗</div><div><div class="transport-option-name">Careem / Private Car</div><div class="transport-option-price">~SR 200–600 / trip</div></div></div>
+                    <p class="transport-option-desc">Door-to-door private car or ride-hail across Saudi Arabia via the Careem app.</p>
+                    <a href="https://www.careem.com" target="_blank" rel="noopener" class="transport-link">Book on Careem.com ↗</a>
+                </div>
+                <div class="transport-option @(selectedTransport == "flight" ? "selected" : "")" @onclick='() => selectedTransport = "flight"'>
+                    <div class="transport-option-header"><div class="transport-icon">✈️</div><div><div class="transport-option-name">Domestic Flight</div><div class="transport-option-price">~SR 300–900 / person</div></div></div>
+                    <p class="transport-option-desc">Fastest for long distances. Flynas and Saudia Airlines cover all major Saudi cities.</p>
+                    <a href="https://www.flynas.com" target="_blank" rel="noopener" class="transport-link">Search flights on Flynas.com ↗</a>
+                </div>
+                <div class="transport-option @(selectedTransport == "train" ? "selected" : "")" @onclick='() => selectedTransport = "train"'>
+                    <div class="transport-option-header"><div class="transport-icon">🚆</div><div><div class="transport-option-name">SAR Train (Haramain)</div><div class="transport-option-price">~SR 50–120 / person</div></div></div>
+                    <p class="transport-option-desc">Haramain High Speed Railway: Makkah–Jeddah–KAEC–Madinah at 300 km/h.</p>
+                    <a href="https://www.hhr.sa" target="_blank" rel="noopener" class="transport-link">View schedule on HHR.sa ↗</a>
+                </div>
+            </div>
+
+            <div class="no-transport @(selectedTransport == "none" ? "selected" : "")" @onclick='() => selectedTransport = "none"'>
+                🚫 I'll arrange my own transport — skip this step
+            </div>
+        </div>
+    }
+
+    <!-- ══════════ STEP 4 ══════════ -->
+    @if (currentStep == 4)
+    {
+        <div class="step-card">
+            <h2>📋 Trip Summary</h2>
+            <p class="step-sub">Review your plan before booking.</p>
+
+            <div class="summary-row"><div class="summary-icon">📋</div><div><div class="summary-label">Selected Plan</div><div class="summary-value">@(selectedPlan?.Name ?? "Custom Plan")</div></div></div>
+            <div class="summary-row"><div class="summary-icon">📍</div><div><div class="summary-label">Destination</div><div class="summary-value">@(GetDestinationName() ?? "Not selected")</div></div></div>
+            <div class="summary-row"><div class="summary-icon">📅</div><div><div class="summary-label">Travel Dates</div><div class="summary-value">@(startDate.HasValue && endDate.HasValue ? $"{startDate.Value:MMM d, yyyy} – {endDate.Value:MMM d, yyyy} ({TripDays} days)" : "Not selected")</div></div></div>
+            <div class="summary-row"><div class="summary-icon">👥</div><div><div class="summary-label">Travelers &amp; Type</div><div class="summary-value">@numTravelers @(numTravelers == 1 ? "person" : "people") — @tripType</div></div></div>
+            <div class="summary-row"><div class="summary-icon">🚌</div><div><div class="summary-label">Transport</div><div class="summary-value">@TransportLabel</div></div></div>
+
+            @if (step2SelectedActivities.Any())
+            {
+                <div class="summary-row"><div class="summary-icon">🎯</div><div><div class="summary-label">Selected Activities (@step2SelectedActivities.Count)</div><div class="summary-value">@string.Join(", ", step2SelectedActivities.Select(a => a.Name))</div></div></div>
+            }
+
+            <div class="cost-breakdown">
+                <div class="cost-line"><span>Plan base price (@numTravelers pax)</span><span>SR @((selectedPlan?.BasePrice ?? budgetPerPerson) * numTravelers)</span></div>
+                <div class="cost-line">
+                    <span>Activities (@step2SelectedActivities.Count selected)</span>
+                    <span>SR @(step2SelectedActivities.Any() ? (step2SelectedActivities.Sum(a => a.Price) * numTravelers).ToString("N0") : "0")</span>
+                </div>
+                @if (selectedTransport != "none" && selectedTransport != "")
+                {
+                    <div class="cost-line"><span>Transport (@TransportLabel)</span><span>SR @TransportCost</span></div>
+                }
+                <div class="cost-line"><span>Tax (15% VAT)</span><span>SR @(((selectedPlan?.BasePrice ?? budgetPerPerson) * numTravelers * 0.15m).ToString("N0"))</span></div>
+                <div class="cost-line total"><span>Estimated Total</span><span>SR @TotalCostDisplay</span></div>
+            </div>
+            <p style="font-size:0.78rem;color:#9A8878;margin-top:0.5rem;">* Transport costs are estimates. Final amount confirmed at checkout.</p>
+
+            @{ var _msgStyle = (saveMessage != null && saveMessage.StartsWith("❌"))
+                ? "padding:.75rem 1rem;border-radius:8px;margin-top:.5rem;font-size:.88rem;background:#FFF5F5;border:1.5px solid #FC8181;color:#C53030;"
+                : "padding:.75rem 1rem;border-radius:8px;margin-top:.5rem;font-size:.88rem;background:#F0FFF4;border:1.5px solid #68D391;color:#276749;"; }
+            @if (!string.IsNullOrEmpty(saveMessage))
+            {
+                <div style="@_msgStyle">@saveMessage</div>
+            }
+
+            <div class="summary-actions">
+                <button class="btn-action outline" @onclick="SaveItinerary" disabled="@isSaving">
+                    💾 @(isSaving ? "Saving…" : "Save Itinerary")
+                </button>
+                <button class="btn-action outline" @onclick='() => Nav.NavigateTo("/trip-buddy")'>
+                    🤝 Find Trip Buddy
+                </button>
+                <button class="btn-action proceed" @onclick="ProceedToCheckout">
+                    🎫 Proceed to Booking → SR @TotalCostDisplay
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="planner-nav">
+        <button class="btn-prev" @onclick="GoBack" disabled="@(currentStep == 1)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Previous
+        </button>
+        @if (currentStep < 4)
+        {
+            <button class="btn-next" @onclick="async () => await GoNext()">
+                Next
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+        }
+    </div>
+
+</div>
+
+@code {
+    // ── Incoming params ───────────────────────────────────────────────────────
+    private int         incomingDestinationId   = 0;
+    private string      incomingDestinationName = "";
+    private List<int>   incomingActivityIds     = new();
+    private decimal     incomingActivityTotal   = 0m;
+
+    // ── Planner state ─────────────────────────────────────────────────────────
+    private int               currentStep           = 1;
+    private List<Destination> allDestinations       = new();
+    private int               selectedDestinationId = 0;
+    private DateTime?         startDate;
+    private DateTime?         endDate;
+    private int               numTravelers          = 2;
+    private string            tripType              = "Couple";
+    private int               budgetPerPerson       = 2000;
+    private string            selectedTransport     = "";
+
+    // ── Step-2 activities (loaded from DB per destination) ────────────────────
+    private List<Activity> destinationActivities    = new();
+    private HashSet<int>   step2SelectedActivityIds = new();
+    private List<Activity> step2SelectedActivities  => destinationActivities.Where(a => step2SelectedActivityIds.Contains(a.Id)).ToList();
+    private bool           activitiesLoading        = false;
+
+    // ── AI suggestion ─────────────────────────────────────────────────────────
+    private string aiPromptText = "";
+    private string aiResult     = "";
+    private bool   aiLoading    = false;
+    private bool   aiIsError    = false;
+
+    // ── Plans ─────────────────────────────────────────────────────────────────
+    private int          selectedPlanId = 0;
+    private PlanTemplate? selectedPlan;
+    private HashSet<int> expandedPlanIds = new();
+
+    // ── MCDM ─────────────────────────────────────────────────────────────────
+    private int    mcdmBudget    = 3;
+    private int    mcdmAdventure = 3;
+    private int    mcdmCulture   = 3;
+    private int    mcdmFamily    = 2;
+    private int    mcdmLuxury    = 2;
+    private string mcdmResult    = "";
+    private List<(string Name, double Score, string Badge)> mcdmRanking = new();
+
+    private class PlanTemplate
+    {
+        public int    Id                 { get; init; }
+        public string Name               { get; init; } = "";
+        public string Category           { get; init; } = "";
+        public string BadgeClass         { get; init; } = "";
+        public string Description        { get; init; } = "";
+        public string ImageUrl           { get; init; } = "";
+        public int    Days               { get; init; }
+        public string Travelers          { get; init; } = "";
+        public decimal BasePrice         { get; init; }
+        public string HotelTier          { get; init; } = "";
+        public int    ActivitiesIncluded { get; init; }
+        public bool   MealsIncluded      { get; init; }
+        public bool   TransportIncluded  { get; init; }
+        public List<string> DayByDay     { get; init; } = new();
+        public int WBudget    { get; init; }
+        public int WAdventure { get; init; }
+        public int WCulture   { get; init; }
+        public int WFamily    { get; init; }
+        public int WLuxury    { get; init; }
+    }
+
+    private readonly List<PlanTemplate> prebuiltPlans = new()
+    {
+        new PlanTemplate { Id=1, Name="Budget Explorer", Category="Budget", BadgeClass="badge-budget", Description="4-day Riyadh highlights on a shoestring — cultural tours, heritage walks, and famous landmarks.", ImageUrl="https://images.unsplash.com/photo-1586724237569-f3d0c1dee8c6?w=600", Days=4, Travelers="1–4 people", BasePrice=600, HotelTier="3-star", ActivitiesIncluded=3, MealsIncluded=false, TransportIncluded=false, DayByDay=new(){"Day 1: Arrive Riyadh · Heritage Walking Tour","Day 2: Diriyah UNESCO Site · Traditional Souq","Day 3: Kingdom Centre Tower · Al-Masmak Fortress","Day 4: National Museum · Departure"}, WBudget=5, WAdventure=2, WCulture=3, WFamily=2, WLuxury=1 },
+        new PlanTemplate { Id=2, Name="Heritage Discovery", Category="Cultural", BadgeClass="badge-cultural", Description="6-day deep dive into ancient Saudi history: Diriyah, AlUla, and Madain Saleh UNESCO sites.", ImageUrl="https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=600", Days=6, Travelers="1–8 people", BasePrice=1800, HotelTier="4-star", ActivitiesIncluded=5, MealsIncluded=true, TransportIncluded=false, DayByDay=new(){"Day 1: Arrive Riyadh · Diriyah at-Turaif","Day 2: Fly to AlUla · Hegra Archaeological Site","Day 3: Dadan & Jabal Ikmah inscriptions","Day 4: Madain Saleh (Hegra UNESCO) full day","Day 5: AlUla Old Town & Souq","Day 6: Return flight"}, WBudget=3, WAdventure=2, WCulture=5, WFamily=3, WLuxury=2 },
+        new PlanTemplate { Id=3, Name="Desert Adventure", Category="Adventure", BadgeClass="badge-adventure", Description="5 days of dune bashing, camel trekking, stargazing, and Bedouin camp experiences.", ImageUrl="https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600", Days=5, Travelers="2–10 people", BasePrice=1400, HotelTier="Desert eco-lodge", ActivitiesIncluded=4, MealsIncluded=true, TransportIncluded=true, DayByDay=new(){"Day 1: Arrive Riyadh · Drive to Empty Quarter","Day 2: Dune Bashing & Desert Safari","Day 3: Camel Trekking · Sunset dunes","Day 4: Bedouin Camp · Stargazing","Day 5: Return to Riyadh"}, WBudget=2, WAdventure=5, WCulture=2, WFamily=3, WLuxury=2 },
+        new PlanTemplate { Id=4, Name="Family Kingdom Tour", Category="Family", BadgeClass="badge-family", Description="7-day family-friendly itinerary: Jeddah Corniche, Al-Balad, and Asir Mountains.", ImageUrl="https://images.unsplash.com/photo-1539667284076-a4d98d9ac42b?w=600", Days=7, Travelers="4–12 people", BasePrice=2200, HotelTier="4-star family resort", ActivitiesIncluded=6, MealsIncluded=true, TransportIncluded=true, DayByDay=new(){"Day 1: Arrive Jeddah · Corniche","Day 2: Al-Balad Historic District","Day 3: Floating Mosque · Red Sea Snorkeling","Day 4: Fly to Abha · Asir National Park","Day 5: Asir cable car · Village tour","Day 6: Souvenir shopping · Rest","Day 7: Return"}, WBudget=2, WAdventure=2, WCulture=4, WFamily=5, WLuxury=3 },
+        new PlanTemplate { Id=5, Name="Red Sea Luxury Escape", Category="Luxury", BadgeClass="badge-luxury", Description="5-day ultra-premium resort at NEOM, Sharm Tabuk, and Red Sea coast with private activities.", ImageUrl="https://images.unsplash.com/photo-1564769611905-cd27ee64e59b?w=600", Days=5, Travelers="2–4 people", BasePrice=5500, HotelTier="5-star resort", ActivitiesIncluded=4, MealsIncluded=true, TransportIncluded=true, DayByDay=new(){"Day 1: Private transfer · NEOM resort check-in","Day 2: Red Sea Scuba Diving (private instructor)","Day 3: Luxury yacht · Snorkeling & sunset dinner","Day 4: Sharm Tabuk spa · Private beach","Day 5: Helicopter transfer · Departure"}, WBudget=1, WAdventure=2, WCulture=2, WFamily=3, WLuxury=5 },
+        new PlanTemplate { Id=6, Name="AlUla & Hegra Explorer", Category="Standard", BadgeClass="badge-standard", Description="4 days at Nabataean tombs, rock formations, and luxury eco-lodges of AlUla.", ImageUrl="https://images.unsplash.com/photo-1616236197457-53e96373d0b0?w=600", Days=4, Travelers="2–6 people", BasePrice=2800, HotelTier="Boutique eco-lodge", ActivitiesIncluded=4, MealsIncluded=true, TransportIncluded=false, DayByDay=new(){"Day 1: Arrive AlUla · Welcome dinner","Day 2: Hegra UNESCO full-day tour","Day 3: AlUla Old Town · Elephant Rock · Hot-air balloon","Day 4: Jabal Ikmah · Dadan · Return"}, WBudget=2, WAdventure=3, WCulture=5, WFamily=3, WLuxury=4 },
+    };
+
+    // ── Computed ──────────────────────────────────────────────────────────────
+    private int TripDays => (startDate.HasValue && endDate.HasValue && endDate > startDate) ? (int)(endDate.Value - startDate.Value).TotalDays : 0;
+    private string TransportLabel => selectedTransport switch { "saptco" => "SAPTCO Bus", "careem" => "Careem / Private Car", "flight" => "Domestic Flight", "train" => "SAR Train (Haramain)", "none" => "Own arrangement", _ => "Not selected" };
+    private int TransportCost => selectedTransport switch { "saptco" => 120 * numTravelers, "careem" => 300 * numTravelers, "flight" => 500 * numTravelers, "train" => 90 * numTravelers, _ => 0 };
+    private string TotalCostDisplay
+    {
+        get
+        {
+            var planBase      = (selectedPlan?.BasePrice ?? budgetPerPerson) * numTravelers;
+            var activitiesCost = step2SelectedActivities.Any()
+                ? step2SelectedActivities.Sum(a => a.Price) * numTravelers
+                : incomingActivityTotal > 0
+                    ? incomingActivityTotal * numTravelers
+                    : incomingActivityIds.Count * 150m * numTravelers;
+            var subtotal = planBase + activitiesCost + TransportCost;
+            return (subtotal * 1.15m).ToString("N0");
+        }
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var uri   = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("destinationId", out var dIdVal) && int.TryParse(dIdVal, out var dId))
+        {
+            incomingDestinationId = dId;
+            selectedDestinationId = dId;
+        }
+
+        if (query.TryGetValue("activities", out var actVal) && !string.IsNullOrEmpty(actVal))
+        {
+            incomingActivityIds = actVal.ToString()
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => int.TryParse(s, out var n) ? n : 0)
+                .Where(n => n > 0).ToList();
+        }
+
+        if (query.TryGetValue("activityTotal", out var actTotalVal))
+            decimal.TryParse(actTotalVal, out incomingActivityTotal);
+
+        try { allDestinations = await DestinationService.GetAllAsync(); }
+        catch (Exception ex) { Console.WriteLine("[Planner] Destinations: " + ex.Message); }
+
+        if (incomingDestinationId > 0)
+            incomingDestinationName = allDestinations.FirstOrDefault(d => d.Id == incomingDestinationId)?.Name ?? $"Destination #{incomingDestinationId}";
+
+        // Read dates from query string (set when coming from MyItineraries "Edit in Planner")
+        if (query.TryGetValue("startDate", out var sdVal) && DateTime.TryParse(sdVal, out var sdParsed))
+            startDate = sdParsed;
+        else
+            startDate = DateTime.Today.AddDays(14);
+
+        if (query.TryGetValue("endDate", out var edVal) && DateTime.TryParse(edVal, out var edParsed))
+            endDate = edParsed;
+        else
+            endDate = DateTime.Today.AddDays(21);
+
+        if (selectedDestinationId > 0)
+            await LoadDestinationActivitiesAsync();
+
+        // Destination is pre-selected from DestinationDetails, but user still
+        // starts at Step 1 (Choose Plan) — that is always the first decision.
+        // We do NOT auto-advance; we only pre-select the destination dropdown.
+        if (incomingDestinationId > 0 && selectedPlanId == 0)
+            SelectPlan(prebuiltPlans[1]); // Heritage Discovery as a helpful default
+    }
+
+    private async Task LoadDestinationActivitiesAsync()
+    {
+        if (selectedDestinationId <= 0) return;
+        activitiesLoading = true;
+        StateHasChanged();
+        try
+        {
+            // Fetches ONLY activities for this destination from DB — not all activities
+            var result = await ActivityService.GetByDestinationIdAsync(selectedDestinationId);
+            destinationActivities = result?.ToList() ?? new();
+            // Pre-select any activities passed in from DestinationDetails
+            step2SelectedActivityIds = incomingActivityIds.ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Planner] Activities for dest {selectedDestinationId}: {ex.Message}");
+            destinationActivities = new();
+        }
+        activitiesLoading = false;
+    }
+
+    private void ToggleStep2Activity(Activity act)
+    {
+        if (step2SelectedActivityIds.Contains(act.Id)) step2SelectedActivityIds.Remove(act.Id);
+        else step2SelectedActivityIds.Add(act.Id);
+        StateHasChanged();
+    }
+
+    // ── AI Suggestion (FIXED — calls Claude API properly) ─────────────────────
+    private async Task RunAiSuggestion()
+    {
+        if (string.IsNullOrWhiteSpace(aiPromptText)) return;
+        aiLoading = true;
+        aiResult  = "";
+        aiIsError = false;
+        StateHasChanged();
+
+        try
+        {
+            var planList = string.Join("; ", prebuiltPlans.Select(p =>
+                $"{p.Name} ({p.Category}, {p.Days} days, SR {p.BasePrice}/person, {p.ActivitiesIncluded} activities, {p.HotelTier}, includes meals: {p.MealsIncluded}, transport: {p.TransportIncluded})"));
+
+            var systemPrompt = $"You are a Saudi Arabia travel expert for Dunes of Arabia. The user will describe their ideal trip. Recommend the single best plan from this list: {planList}. Respond ONLY with valid JSON (no markdown, no backticks): {{\"recommendedPlan\": \"<exact plan name from the list>\", \"reason\": \"<2-3 sentences explaining why this plan fits their needs>\"}}";
+
+            var requestBody = new
+            {
+                model      = "llama-3.3-70b-versatile",
+                max_tokens = 400,
+                messages   = new[]
+                {
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user",   content = aiPromptText }
+                }
+            };
+
+            var json    = System.Text.Json.JsonSerializer.Serialize(requestBody);
+            var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            using var http = HttpClientFactory.CreateClient();
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {Configuration["Groq:ApiKey"]}");
+
+            var response = await http.PostAsync("https://api.groq.com/openai/v1/chat/completions", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                aiResult  = $"⚠️ AI service returned {(int)response.StatusCode}. Please try the Smart Match sliders below instead.";
+                aiIsError = true;
+            }
+            else
+            {
+                var raw = await response.Content.ReadAsStringAsync();
+                using var doc  = System.Text.Json.JsonDocument.Parse(raw);
+                var textBlock  = doc.RootElement
+                                    .GetProperty("choices")[0]
+                                    .GetProperty("message")
+                                    .GetProperty("content")
+                                    .GetString() ?? "";
+
+                // Strip any accidental markdown fences
+                textBlock = textBlock.Trim();
+                if (textBlock.StartsWith("```")) { textBlock = textBlock.Split('\n', 2).Last(); }
+                if (textBlock.EndsWith("```"))   { textBlock = textBlock[..textBlock.LastIndexOf("```")]; }
+                textBlock = textBlock.Trim();
+
+                using var resultDoc = System.Text.Json.JsonDocument.Parse(textBlock);
+                var planName        = resultDoc.RootElement.GetProperty("recommendedPlan").GetString() ?? "";
+                var reason          = resultDoc.RootElement.GetProperty("reason").GetString() ?? "";
+
+                var match = prebuiltPlans.FirstOrDefault(p => p.Name.Equals(planName, StringComparison.OrdinalIgnoreCase));
+                if (match != null) SelectPlan(match);
+
+                aiResult = $"✨ {reason}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Planner] AI suggestion error: {ex.Message}");
+            aiResult  = "⚠️ Could not get AI recommendation right now. Please try the Smart Match sliders below instead.";
+            aiIsError = true;
+        }
+
+        aiLoading = false;
+        StateHasChanged();
+    }
+
+    // ── Plan selection ────────────────────────────────────────────────────────
+    private void SelectPlan(PlanTemplate plan)
+    {
+        selectedPlanId  = plan.Id;
+        selectedPlan    = plan;
+        budgetPerPerson = (int)plan.BasePrice;
+    }
+
+    // ── MCDM Matching ─────────────────────────────────────────────────────────
+    private void RunMcdmMatch()
+    {
+        var userVec = new[] { mcdmBudget, mcdmAdventure, mcdmCulture, mcdmFamily, mcdmLuxury };
+        PlanTemplate? best = null;
+        double bestScore = double.MaxValue;
+        foreach (var plan in prebuiltPlans)
+        {
+            var pVec = new[] { plan.WBudget, plan.WAdventure, plan.WCulture, plan.WFamily, plan.WLuxury };
+            double dist = 0;
+            for (int i = 0; i < userVec.Length; i++) dist += Math.Pow(userVec[i] - pVec[i], 2);
+            dist = Math.Sqrt(dist);
+            if (dist < bestScore) { bestScore = dist; best = plan; }
+        }
+        if (best != null) { mcdmResult = $"Best match: \"{best.Name}\" — {best.Description}"; SelectPlan(best); }
+
+        mcdmRanking = prebuiltPlans
+            .Select(plan => {
+                var pVec = new[] { plan.WBudget, plan.WAdventure, plan.WCulture, plan.WFamily, plan.WLuxury };
+                var userVec2 = new[] { mcdmBudget, mcdmAdventure, mcdmCulture, mcdmFamily, mcdmLuxury };
+                double dist = 0;
+                for (int i = 0; i < pVec.Length; i++) dist += Math.Pow(userVec2[i] - pVec[i], 2);
+                return (plan.Name, Math.Sqrt(dist), plan.BadgeClass);
+            })
+            .OrderBy(x => x.Item2)
+            .ToList();
+    }
+
+    private string McdmLabel(int val) => val switch { 1 => "Not important", 2 => "Slightly", 3 => "Moderate", 4 => "Important", 5 => "Very important", _ => "—" };
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+    private async Task GoNext()
+    {
+        if (currentStep == 1 && selectedDestinationId > 0 && !destinationActivities.Any())
+            await LoadDestinationActivitiesAsync();
+        if (currentStep < 4) currentStep++;
+    }
+    private void GoBack() { if (currentStep > 1) currentStep--; }
+    private void SetTripType(string type) { tripType = type; if (type == "Solo") numTravelers = 1; if (type == "Couple") numTravelers = 2; }
+    private void IncrementTravelers() { if (tripType == "Solo") return; if (tripType == "Couple" && numTravelers >= 2) return; if (numTravelers < 20) numTravelers++; }
+    private void DecrementTravelers() { if (tripType == "Solo") return; if (tripType == "Couple") { if (numTravelers > 2) numTravelers--; return; } if (numTravelers > 1) numTravelers--; }
+    private string? GetDestinationName() => allDestinations.FirstOrDefault(d => d.Id == selectedDestinationId)?.Name;
+
+    // ── Save Itinerary ────────────────────────────────────────────────────────
+    private string? currentUserId;
+    private bool    isSaving     = false;
+    private string? saveMessage;
+
+    private async Task SaveItinerary()
+    {
+        isSaving    = true;
+        saveMessage = null;
+        StateHasChanged();
+
+        // Auth check
+        if (currentUserId is null)
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            currentUserId = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+        if (currentUserId is null)
+        {
+            Nav.NavigateTo("/Account/Login?returnUrl=/planner", forceLoad: false);
+            return;
+        }
+
+        // Validation
+        if (selectedDestinationId <= 0)
+        {
+            saveMessage = "❌ Please select a destination before saving.";
+            isSaving = false;
+            StateHasChanged();
+            return;
+        }
+        if (!startDate.HasValue || !endDate.HasValue || endDate <= startDate)
+        {
+            saveMessage = "❌ Please set valid travel dates before saving.";
+            isSaving = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var itinerary = new Itinerary
+            {
+                UserId        = currentUserId,
+                Title         = (selectedPlan?.Name ?? "Custom Plan") + " – " + (GetDestinationName() ?? "Saudi Arabia"),
+                DestinationId = selectedDestinationId,
+                StartDate     = startDate.Value,
+                EndDate       = endDate.Value,
+                Travelers     = numTravelers,
+                TripType      = tripType,
+                Interests     = new List<string> { selectedPlan?.Category ?? "Custom" }
+            };
+            await ItineraryService.SaveAsync(itinerary);
+            saveMessage = "✅ Itinerary saved! Redirecting…";
+            StateHasChanged();
+            await Task.Delay(800);
+            Nav.NavigateTo("/itinerary");
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException?.Message ?? ex.Message;
+            Console.WriteLine($"[Planner] SaveItinerary error: {ex}");
+            saveMessage = $"❌ Could not save itinerary: {inner}";
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Proceed to Checkout ───────────────────────────────────────────────────
+    private void ProceedToCheckout()
+    {
+        var actIds     = string.Join(",", step2SelectedActivityIds);
+        // Use real prices from step-2 selection; fall back to incoming total from DestinationDetails
+        var actTotal   = step2SelectedActivities.Any()
+                            ? step2SelectedActivities.Sum(a => a.Price)
+                            : incomingActivityTotal;
+        var url = $"/checkout" +
+                  $"?destinationId={selectedDestinationId}" +
+                  $"&destinationName={Uri.EscapeDataString(GetDestinationName() ?? "")}" +
+                  $"&planName={Uri.EscapeDataString(selectedPlan?.Name ?? "Custom Plan")}" +
+                  $"&planPrice={selectedPlan?.BasePrice ?? budgetPerPerson}" +
+                  $"&travelers={numTravelers}" +
+                  $"&transport={selectedTransport}" +
+                  $"&transportCost={TransportCost}" +
+                  $"&startDate={startDate?.ToString("yyyy-MM-dd") ?? ""}" +
+                  $"&endDate={endDate?.ToString("yyyy-MM-dd") ?? ""}" +
+                  (!string.IsNullOrEmpty(actIds) ? $"&activities={Uri.EscapeDataString(actIds)}&activityTotal={actTotal}" : "");
+        Nav.NavigateTo(url);
+    }
+}

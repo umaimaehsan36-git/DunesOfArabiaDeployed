@@ -1,0 +1,19 @@
+@* StatusMessage.razor
+   Place at: DunesOfArabia/Components/Account/Shared/StatusMessage.razor
+   
+   Displays a success (green) or error (red) message based on the Message string.
+   Used on Login, Register, ForgotPassword, ResetPassword, and all other Account pages. *@
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div class="@(IsError ? "alert alert-danger" : "alert alert-success")" role="alert">
+        @Message
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+
+    private bool IsError => Message?.StartsWith("Error") == true;
+}

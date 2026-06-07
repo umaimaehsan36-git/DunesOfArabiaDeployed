@@ -1,0 +1,30 @@
+@using DunesOfArabia.Components.Account.Shared
+@using DunesOfArabia.Components.Pages
+@using DunesOfArabia.Components.Layout
+@using Microsoft.AspNetCore.Components.Web
+
+@inject NavigationManager NavigationManager
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+            <NotAuthorized>
+                @{
+                    var path = new Uri(NavigationManager.Uri).AbsolutePath;
+                    if (!path.StartsWith("/Account", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <RedirectToLogin />
+                    }
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Page Not Found</PageTitle>
+        <LayoutView Layout="typeof(MainLayout)">
+            <h2>Sorry, this page could not be found.</h2>
+            <a href="/">Return to Home</a>
+        </LayoutView>
+    </NotFound>
+</Router>

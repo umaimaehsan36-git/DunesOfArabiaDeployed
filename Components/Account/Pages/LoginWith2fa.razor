@@ -1,0 +1,346 @@
+﻿@page "/Account/LoginWith2fa"
+
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using DunesOfArabia.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<LoginWith2fa> Logger
+
+<PageTitle>Two-Factor Authentication – Dunes Of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .auth-page {
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 60% 40%, #E8D9C5 0%, #DFD0B8 50%, #D4C4A8 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    .auth-brand {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+        .auth-brand h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 2.6rem;
+            font-weight: 700;
+            color: #7B2D10;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 0.4rem;
+        }
+
+        .auth-brand p {
+            font-size: 1rem;
+            color: #8B6650;
+        }
+
+    .auth-card {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 3rem 3rem 2.5rem;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 4px 40px rgba(100, 50, 20, 0.10);
+    }
+
+    .card-icon {
+        text-align: center;
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 1.85rem;
+        font-weight: 600;
+        color: #1C0F07;
+        text-align: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .card-subtitle {
+        font-size: 0.9rem;
+        color: #8B6650;
+        text-align: center;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .alert-error {
+        background-color: #FEF2F2;
+        color: #991B1B;
+        border: 1px solid #FCA5A5;
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.6rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #1C0F07;
+        margin-bottom: 0.6rem;
+    }
+
+    /* Code input — large and clear */
+    .code-input {
+        width: 100%;
+        padding: 16px;
+        border: 1.5px solid #E5D8C8;
+        border-radius: 8px;
+        font-size: 1.6rem;
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #1C0F07;
+        background-color: #FDFAF7;
+        text-align: center;
+        letter-spacing: 6px;
+        transition: border-color 0.25s, box-shadow 0.25s;
+        appearance: none;
+    }
+
+        .code-input:focus {
+            outline: none;
+            border-color: #8B5A3C;
+            background-color: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(139, 90, 60, 0.12);
+        }
+
+        .code-input::placeholder {
+            color: #BBA898;
+            font-weight: 300;
+            letter-spacing: 4px;
+        }
+
+    .validation-error {
+        color: #DC2626;
+        font-size: 0.78rem;
+        margin-top: 0.4rem;
+        display: block;
+    }
+
+    .remember-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1.6rem;
+        padding: 12px 14px;
+        background: #FDFAF7;
+        border: 1.5px solid #E5D8C8;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .remember-checkbox {
+        width: 17px;
+        height: 17px;
+        accent-color: #7B2D10;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .remember-label {
+        font-size: 0.875rem;
+        color: #5A3E30;
+        user-select: none;
+        line-height: 1.4;
+    }
+
+    .btn-primary {
+        width: 100%;
+        padding: 15px;
+        background-color: #7B2D10;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+        transition: background-color 0.25s, transform 0.2s, box-shadow 0.25s;
+        margin-bottom: 0.5rem;
+    }
+
+        .btn-primary:hover {
+            background-color: #5C2009;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(123, 45, 16, 0.35);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+    .card-footer-text {
+        text-align: center;
+        font-size: 0.875rem;
+        color: #8B6650;
+        padding-top: 1.4rem;
+        border-top: 1px solid #F0E6D8;
+        margin-top: 1.4rem;
+        line-height: 1.6;
+    }
+
+        .card-footer-text a {
+            color: #7B2D10;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+            .card-footer-text a:hover {
+                text-decoration: underline;
+            }
+
+    @@media (max-width: 600px) {
+        .auth-card {
+            padding: 2.5rem 1.75rem 2rem;
+        }
+
+        .auth-brand h1 {
+            font-size: 2rem;
+        }
+
+        .code-input {
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+        }
+    }
+</style>
+
+<div class="auth-page">
+
+    <div class="auth-brand">
+        <h1>Saudi Heritage</h1>
+        <p>Dunes of Arabia · Travel Platform</p>
+    </div>
+
+    <div class="auth-card">
+        <div class="card-icon">📱</div>
+        <h2 class="card-title">Two-Factor Auth</h2>
+        <p class="card-subtitle">
+            Open your authenticator app and enter the 6-digit code shown for Dunes of Arabia.
+        </p>
+
+        @if (message != null)
+        {
+            <div class="alert-error">⚠️ @message</div>
+        }
+
+        <EditForm Model="Input" FormName="login-with-2fa" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+            <input type="hidden" name="RememberMe" value="@RememberMe" />
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label class="form-label" for="Input.TwoFactorCode">Authenticator Code</label>
+                <InputText @bind-Value="Input.TwoFactorCode"
+                           id="Input.TwoFactorCode"
+                           class="code-input"
+                           autocomplete="one-time-code"
+                           inputmode="numeric"
+                           maxlength="7"
+                           placeholder="000000" />
+                <ValidationMessage For="() => Input.TwoFactorCode" class="validation-error" />
+            </div>
+
+            <label class="remember-row">
+                <InputCheckbox @bind-Value="Input.RememberMachine"
+                               id="Input.RememberMachine"
+                               class="remember-checkbox" />
+                <span class="remember-label">
+                    <strong>Remember this device</strong> — skip 2FA on this device for 30 days
+                </span>
+            </label>
+
+            <button type="submit" class="btn-primary">Verify & Sign In</button>
+        </EditForm>
+
+        <div class="card-footer-text">
+            Don't have access to your device?<br />
+            <a href="Account/LoginWithRecoveryCode?ReturnUrl=@ReturnUrl">Use a recovery code instead</a>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private bool RememberMe { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        user = await SignInManager.GetTwoFactorAuthenticationUserAsync() ??
+            throw new InvalidOperationException("Unable to load two-factor authentication user.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var authenticatorCode = Input.TwoFactorCode!.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var result = await SignInManager.TwoFactorAuthenticatorSignInAsync(authenticatorCode, RememberMe, Input.RememberMachine);
+        var userId = await UserManager.GetUserIdAsync(user);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User with ID '{UserId}' logged in with 2fa.", userId);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User with ID '{UserId}' account locked out.", userId);
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            Logger.LogWarning("Invalid authenticator code entered for user with ID '{UserId}'.", userId);
+            message = "Invalid code. Please check your authenticator app and try again.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Authenticator code is required")]
+        [StringLength(7, ErrorMessage = "Code must be 6–7 characters", MinimumLength = 6)]
+        [DataType(DataType.Text)]
+        [Display(Name = "Authenticator code")]
+        public string? TwoFactorCode { get; set; }
+
+        [Display(Name = "Remember this machine")]
+        public bool RememberMachine { get; set; }
+    }
+}

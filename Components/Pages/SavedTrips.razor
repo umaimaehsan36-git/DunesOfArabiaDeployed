@@ -1,0 +1,633 @@
+@page "/favorites"
+@layout DunesOfArabia.Components.Layout.MainLayout
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using DunesOfArabia.Models
+
+@attribute [Authorize]
+
+@inject IDestinationService DestinationService
+@inject IItineraryService ItineraryService
+@inject IUserFavoriteService UserFavoriteService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Saved Trips – Saudi Heritage</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;500;600&display=swap');
+
+    .dashboard-page {
+        background: #F5EFE8;
+        min-height: 100vh;
+        font-family: 'Lato', sans-serif;
+        padding: 2.4rem 2.2rem 4rem;
+    }
+
+    .dash-header {
+        margin-bottom: 1.8rem;
+    }
+
+        .dash-header h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(1.7rem, 3vw, 2.2rem);
+            color: #1C1008;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .dash-header p {
+            font-size: 0.87rem;
+            color: #8A7566;
+            font-weight: 300;
+        }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.1rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.4rem 1.6rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.06);
+    }
+
+    .stat-label {
+        font-size: 0.78rem;
+        color: #9A8878;
+        margin-bottom: 0.4rem;
+    }
+
+    .stat-value {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 2rem;
+        color: #1C1008;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1.1rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .trip-hero {
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        min-height: 220px;
+        background: #2E1A0E;
+    }
+
+        .trip-hero img {
+            width: 100%;
+            height: 100%;
+            min-height: 220px;
+            object-fit: cover;
+            display: block;
+            opacity: 0.72;
+        }
+
+    .trip-hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to right, rgba(15,8,3,0.72) 40%, rgba(15,8,3,0.1) 100%);
+        padding: 2rem 2.2rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+
+    .trip-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        background: #C8873A;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 700;
+        border-radius: 4px;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+        width: fit-content;
+    }
+
+    .trip-hero-name {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 1.8rem;
+        color: white;
+        font-weight: 700;
+    }
+
+    .trip-hero-dates {
+        font-size: 0.83rem;
+        color: rgba(255,255,255,0.78);
+        margin-bottom: 0.7rem;
+    }
+
+    .btn-view-itinerary {
+        display: inline-flex;
+        align-items: center;
+        padding: 9px 20px;
+        background: white;
+        color: #1C1008;
+        border: none;
+        border-radius: 7px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        cursor: pointer;
+        width: fit-content;
+    }
+
+    .recent-activity {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem 1.6rem;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.06);
+    }
+
+    .panel-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 1.1rem;
+        color: #1C1008;
+        font-weight: 700;
+        margin-bottom: 1.2rem;
+    }
+
+    .activity-item {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #F0E8DC;
+    }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+    .bottom-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.1rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .panel-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.4rem 1.5rem;
+        box-shadow: 0 1px 6px rgba(90,55,35,0.06);
+    }
+
+    .panel-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.2rem;
+    }
+
+    .saved-dest-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.7rem;
+    }
+
+    .saved-dest-thumb {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        aspect-ratio: 1 / 1;
+        cursor: pointer;
+    }
+
+        .saved-dest-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    .saved-dest-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 6px 9px;
+        background: linear-gradient(to top, rgba(15,8,3,0.78) 0%, transparent 100%);
+        color: white;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .trip-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #FAF6F1;
+        border-radius: 8px;
+        padding: 0.9rem 1.1rem;
+        margin-bottom: 0.6rem;
+        cursor: pointer;
+    }
+
+    .trip-status {
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .status-upcoming {
+        background: #C8873A;
+        color: white;
+    }
+
+    .status-completed {
+        background: #7B3121;
+        color: white;
+    }
+
+    .status-planning {
+        background: #D4C0B4;
+        color: #5A3A2A;
+    }
+
+    @@media (max-width: 768px) {
+
+        .dashboard-page {
+            padding: 1.5rem 1.2rem 3rem;
+        }
+
+        .stats-row,
+        .bottom-grid,
+        .main-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .saved-dest-grid {
+            grid-template-columns: repeat(2,1fr);
+        }
+    }
+</style>
+
+<div class="dashboard-page">
+
+    <div class="dash-header">
+        <h1>Welcome back, @userName</h1>
+        <p>Your Saudi Arabia adventure dashboard</p>
+    </div>
+
+    <div class="stats-row">
+
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">Saved Destinations</div>
+                <div class="stat-value">@savedDestinations.Count</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">My Trips</div>
+                <div class="stat-value">@myTrips.Count</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">Activities Booked</div>
+                <div class="stat-value">@activitiesBooked</div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="main-grid">
+
+        <div class="trip-hero">
+
+            @if (upcomingTrip != null)
+            {
+                <img src="@upcomingTrip.ImageUrl"
+                     alt="@upcomingTrip.DestinationName" />
+
+                <div class="trip-hero-overlay">
+
+                    <span class="trip-badge">Upcoming Trip</span>
+
+                    <div class="trip-hero-name">
+                        @upcomingTrip.DestinationName
+                    </div>
+
+                    <div class="trip-hero-dates">
+                        @upcomingTrip.DateRange
+                    </div>
+
+                    <button class="btn-view-itinerary"
+                            @onclick='() => Nav.NavigateTo("/destination/" + upcomingTrip.DestId)'>
+
+                        View Destination
+
+                    </button>
+
+                </div>
+            }
+            else
+            {
+                <div class="trip-hero-overlay">
+
+                    <span class="trip-badge">No Upcoming Trips</span>
+
+                    <div class="trip-hero-name">
+                        Start Planning
+                    </div>
+
+                    <button class="btn-view-itinerary"
+                            @onclick='() => Nav.NavigateTo("/planner")'>
+
+                        Plan a Trip
+
+                    </button>
+
+                </div>
+            }
+
+        </div>
+
+        <div class="recent-activity">
+
+            <div class="panel-title">
+                Recent Activity
+            </div>
+
+            @foreach (var item in recentActivity)
+            {
+                <div class="activity-item">
+
+                    <div><strong>@item.Action</strong></div>
+
+                    <div>@item.Detail</div>
+
+                    <div style="font-size:0.75rem;color:#999;">
+                        @item.TimeAgo
+                    </div>
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+    <div class="bottom-grid">
+
+        <div class="panel-card">
+
+            <div class="panel-card-header">
+                <h3>My Saved Destinations</h3>
+            </div>
+
+            @if (savedDestinations.Any())
+            {
+                <div class="saved-dest-grid">
+
+                    @foreach (var d in savedDestinations.Take(3))
+                    {
+                        <div class="saved-dest-thumb"
+                             @onclick='() => Nav.NavigateTo("/destination/" + d.Id)'>
+
+                            <img src="@d.ImageUrl" alt="@d.Name" />
+
+                            <div class="saved-dest-name">
+                                @d.Name
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+            }
+
+        </div>
+
+        <div class="panel-card">
+
+            <div class="panel-card-header">
+                <h3>My Trips</h3>
+            </div>
+
+            @if (myTrips.Any())
+            {
+                @foreach (var t in myTrips.Take(4))
+                {
+                    <div class="trip-row"
+                         @onclick='() => Nav.NavigateTo("/destination/" + t.DestId)'>
+
+                        <div>
+
+                            <div>
+                                <strong>@t.DestinationName</strong>
+                            </div>
+
+                            <div style="font-size:0.8rem;color:#888;">
+                                @t.MonthYear
+                            </div>
+
+                        </div>
+
+                        <div>
+
+                            <span class="trip-status @t.StatusClass">
+                                @t.Status
+                            </span>
+
+                        </div>
+
+                    </div>
+                }
+            }
+
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+    private class TripSummary
+    {
+        public int ItineraryId { get; set; }
+
+        public int DestId { get; set; }
+
+        public string DestinationName { get; set; } = "";
+
+        public string MonthYear { get; set; } = "";
+
+        public string DateRange { get; set; } = "";
+
+        public int DaysUntil { get; set; }
+
+        public string Status { get; set; } = "";
+
+        public string StatusClass { get; set; } = "";
+
+        public int ActivityCount { get; set; }
+
+        public string ImageUrl { get; set; } = "";
+    }
+
+    private class FeedItem
+    {
+        public string Action { get; set; } = "";
+
+        public string Detail { get; set; } = "";
+
+        public string TimeAgo { get; set; } = "";
+    }
+
+    private string userName = "Traveller";
+
+    private List<Destination> savedDestinations = new();
+
+    private List<TripSummary> myTrips = new();
+
+    private TripSummary? upcomingTrip;
+
+    private List<FeedItem> recentActivity = new();
+
+    private int activitiesBooked = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth =
+            await AuthStateProvider.GetAuthenticationStateAsync();
+
+        var userId =
+            auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+
+        userName =
+            auth.User.Identity?.Name ?? "Traveller";
+
+        try
+        {
+            var allDest =
+                await DestinationService.GetAllAsync();
+
+            var itineraries =
+                await ItineraryService.GetUserItinerariesAsync(userId);
+
+            var favs =
+                await UserFavoriteService.GetUserFavoritesAsync(userId);
+
+            if (favs != null)
+            {
+                var favIds =
+                    favs.Select(f => f.DestinationId).ToHashSet();
+
+                savedDestinations =
+                    allDest
+                        .Where(d => favIds.Contains(d.Id))
+                        .ToList();
+            }
+
+            myTrips = itineraries
+                .Select(itin =>
+                {
+                    var dest =
+                        allDest.FirstOrDefault(d => d.Id == itin.DestinationId);
+
+                    bool isUpcoming =
+                        itin.StartDate > DateTime.Today;
+
+                    bool isCompleted =
+                        itin.EndDate < DateTime.Today;
+
+                    return new TripSummary
+                    {
+                        ItineraryId = itin.Id,
+
+                        DestId = itin.DestinationId,
+
+                        DestinationName =
+                            dest?.Name ?? "Trip",
+
+                        MonthYear =
+                            itin.StartDate.ToString("MMMM yyyy"),
+
+                        DateRange =
+                            itin.StartDate.ToString("MMMM d")
+                            + " - " +
+                            itin.EndDate.ToString("MMMM d, yyyy"),
+
+                        DaysUntil =
+                            Math.Max(0,
+                                (itin.StartDate - DateTime.Today).Days),
+
+                        Status =
+                            isUpcoming
+                                ? "Upcoming"
+                                : isCompleted
+                                    ? "Completed"
+                                    : "Planning",
+
+                        StatusClass =
+                            isUpcoming
+                                ? "status-upcoming"
+                                : isCompleted
+                                    ? "status-completed"
+                                    : "status-planning",
+
+                        ActivityCount =
+                            itin.Activities?.Count ?? 0,
+
+                        ImageUrl =
+                            dest?.ImageUrl ?? ""
+                    };
+                })
+                .OrderBy(t => t.DaysUntil)
+                .ToList();
+
+            upcomingTrip =
+                myTrips.FirstOrDefault(t => t.Status == "Upcoming");
+
+            activitiesBooked =
+                myTrips.Sum(t => t.ActivityCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+
+        // Build recent activity feed from real itineraries
+        recentActivity = myTrips
+            .OrderByDescending(t => t.DaysUntil)
+            .Take(5)
+            .Select(t => new FeedItem
+            {
+                Action  = t.Status == "Upcoming" ? "Planned trip to" : t.Status == "Completed" ? "Completed trip to" : "Saved itinerary for",
+                Detail  = t.DestinationName,
+                TimeAgo = t.MonthYear
+            })
+            .ToList();
+
+        if (!recentActivity.Any())
+        {
+            recentActivity.Add(new FeedItem
+            {
+                Action  = "Welcome!",
+                Detail  = "Start planning your first Saudi adventure.",
+                TimeAgo = "Now"
+            });
+        }
+    }
+}

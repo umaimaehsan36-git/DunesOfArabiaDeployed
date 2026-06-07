@@ -1,0 +1,56 @@
+@* Shared/PageHeader.razor *@
+@* Reusable page title + subtitle block *@
+@* Usage: <PageHeader Title="Explore Saudi Arabia" Subtitle="Discover breathtaking destinations" /> *@
+
+<style>
+    .page-header-wrap {
+        padding: 2.8rem 0 1.8rem;
+    }
+
+    .page-header-wrap h1 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 2.4rem;
+        color: #2E1A0E;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        line-height: 1.2;
+    }
+
+    .page-header-wrap p {
+        font-size: 0.95rem;
+        color: #7A6658;
+        line-height: 1.5;
+    }
+
+    .page-header-wrap .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: #C8873A;
+        margin-bottom: 0.5rem;
+    }
+
+    @@media (max-width: 640px) {
+        .page-header-wrap h1 { font-size: 1.8rem; }
+    }
+</style>
+
+<div class="page-header-wrap">
+    @if (!string.IsNullOrEmpty(Badge))
+    {
+        <span class="badge">@Badge</span>
+    }
+    <h1>@Title</h1>
+    @if (!string.IsNullOrEmpty(Subtitle))
+    {
+        <p>@Subtitle</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title    { get; set; } = "";
+    [Parameter] public string Subtitle { get; set; } = "";
+    [Parameter] public string Badge    { get; set; } = "";   // e.g. "SAUDI ARABIA"
+}

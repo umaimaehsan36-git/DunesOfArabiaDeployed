@@ -1,0 +1,87 @@
+@* Shared/LoadingSkeleton.razor *@
+@* Shows animated skeleton cards while data loads *@
+@* Usage: <LoadingSkeleton Count="6" CardHeight="210" /> *@
+
+<style>
+    .skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--cols, 3), 1fr);
+        gap: 1.6rem;
+    }
+
+    .skeleton-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(90,55,35,0.07);
+    }
+
+    .skeleton-img {
+        width: 100%;
+        background: linear-gradient(90deg, #e8e0d8 25%, #f0ebe4 50%, #e8e0d8 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+    }
+
+    .skeleton-body {
+        padding: 1.2rem 1.3rem 1.4rem;
+    }
+
+    .skeleton-line {
+        height: 13px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #e8e0d8 25%, #f0ebe4 50%, #e8e0d8 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+        margin-bottom: 0.75rem;
+    }
+
+        .skeleton-line.w-full {
+            width: 100%;
+        }
+
+        .skeleton-line.w-70 {
+            width: 70%;
+        }
+
+        .skeleton-line.w-50 {
+            width: 50%;
+        }
+
+        .skeleton-line.as-btn {
+            height: 38px;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+        }
+
+    @@keyframes shimmer {
+        0% {
+            background-position: 200% 0;
+        }
+
+        100% {
+            background-position: -200% 0;
+        }
+    }
+</style>
+
+<div class="skeleton-grid" style="--cols: @Columns;">
+    @for (int i = 0; i < Count; i++)
+    {
+        <div class="skeleton-card">
+            <div class="skeleton-img" style="height: @(CardHeight)px;"></div>
+            <div class="skeleton-body">
+                <div class="skeleton-line w-full"></div>
+                <div class="skeleton-line w-70"></div>
+                <div class="skeleton-line w-50"></div>
+                <div class="skeleton-line w-full as-btn"></div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Count { get; set; } = 6;
+    [Parameter] public int CardHeight { get; set; } = 210;
+    [Parameter] public int Columns { get; set; } = 3;
+}

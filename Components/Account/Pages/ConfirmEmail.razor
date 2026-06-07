@@ -1,0 +1,231 @@
+﻿@page "/Account/ConfirmEmail"
+
+@layout DunesOfArabia.Components.Layout.EmptyLayout
+
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using DunesOfArabia.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Email Confirmed – Dunes Of Arabia</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+    *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .auth-page {
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 60% 40%, #E8D9C5 0%, #DFD0B8 50%, #D4C4A8 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    .auth-brand {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+        .auth-brand h1 {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 2.6rem;
+            font-weight: 700;
+            color: #7B2D10;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 0.4rem;
+        }
+
+        .auth-brand p {
+            font-size: 1rem;
+            color: #8B6650;
+        }
+
+    .auth-card {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 3rem;
+        width: 100%;
+        max-width: 520px;
+        box-shadow: 0 4px 40px rgba(100, 50, 20, 0.10);
+        text-align: center;
+    }
+
+    .card-icon {
+        font-size: 4rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 1.85rem;
+        font-weight: 600;
+        color: #1C0F07;
+        margin-bottom: 1rem;
+    }
+
+    .card-body {
+        font-size: 0.95rem;
+        color: #5A3E30;
+        line-height: 1.7;
+        margin-bottom: 2rem;
+    }
+
+    .alert-error {
+        background-color: #FEF2F2;
+        color: #991B1B;
+        border: 1px solid #FCA5A5;
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+
+    .features-row {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .feature-pill {
+        background: #FBF7F2;
+        border: 1px solid #E5D8C8;
+        border-radius: 20px;
+        padding: 8px 16px;
+        font-size: 0.8rem;
+        color: #5A3E30;
+        font-weight: 500;
+    }
+
+    .btn-primary {
+        display: inline-block;
+        padding: 14px 40px;
+        background-color: #7B2D10;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+        text-decoration: none;
+        transition: background-color 0.25s, transform 0.2s, box-shadow 0.25s;
+    }
+
+        .btn-primary:hover {
+            background-color: #5C2009;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(123, 45, 16, 0.35);
+        }
+
+    @@media (max-width: 600px) {
+        .auth-card {
+            padding: 2.5rem 1.75rem;
+        }
+
+        .auth-brand h1 {
+            font-size: 2rem;
+        }
+    }
+</style>
+
+<div class="auth-page">
+
+    <div class="auth-brand">
+        <h1>Saudi Heritage</h1>
+        <p>Dunes of Arabia · Travel Platform</p>
+    </div>
+
+    <div class="auth-card">
+
+        @if (isSuccess)
+        {
+            <div class="card-icon">🎉</div>
+            <h2 class="card-title">Email Confirmed!</h2>
+            <p class="card-body">
+                Your account is now fully verified. Welcome to Dunes of Arabia — your gateway to discovering Saudi Arabia's most breathtaking destinations.
+            </p>
+
+            <div class="features-row">
+                <span class="feature-pill">🗺️ Plan Trips</span>
+                <span class="feature-pill">🏛️ Explore Destinations</span>
+                <span class="feature-pill">⭐ Leave Reviews</span>
+                <span class="feature-pill">❤️ Save Favourites</span>
+            </div>
+
+            <a href="/Account/Login" class="btn-primary">Start Exploring</a>
+        }
+        else
+        {
+            <div class="card-icon">❌</div>
+            <h2 class="card-title">Confirmation Failed</h2>
+            <div class="alert-error">⚠️ @statusMessage</div>
+            <p class="card-body">
+                The confirmation link may have expired or already been used.
+                Please request a new confirmation email.
+            </p>
+            <a href="/Account/ResendEmailConfirmation" class="btn-primary">Resend Confirmation</a>
+        }
+
+    </div>
+
+</div>
+
+@code {
+    private bool isSuccess = false;
+    private string? statusMessage;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Code { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is null || Code is null)
+        {
+            RedirectManager.RedirectTo("");
+            return;
+        }
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user is null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            statusMessage = $"Error: could not find user with ID {UserId}.";
+            isSuccess = false;
+        }
+        else
+        {
+            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+            var result = await UserManager.ConfirmEmailAsync(user, code);
+            if (result.Succeeded)
+            {
+                isSuccess = true;
+            }
+            else
+            {
+                isSuccess = false;
+                statusMessage = "This confirmation link is invalid or has already been used.";
+            }
+        }
+    }
+}
