@@ -37,7 +37,7 @@ namespace DunesOfArabia.Migrations
                     FirstName = table.Column<string>(type: "character varying(75)", maxLength: 75, nullable: true),
                     LastName = table.Column<string>(type: "character varying(75)", maxLength: 75, nullable: true),
                     AvatarUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
                     UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -99,7 +99,7 @@ namespace DunesOfArabia.Migrations
                     Rating = table.Column<double>(type: "double precision", nullable: false),
                     BestSeason = table.Column<string>(type: "text", nullable: false),
                     Temperature = table.Column<string>(type: "text", nullable: false),
-                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ImageGalleryJson = table.Column<string>(type: "text", nullable: false),
                     ImageGallery = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -127,7 +127,7 @@ namespace DunesOfArabia.Migrations
                     Bio = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true),
                     TotalSpots = table.Column<int>(type: "integer", nullable: false),
                     SpotsLeft = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "GETUTCDATE()")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()")
                 },
                 constraints: table =>
                 {
@@ -146,7 +146,7 @@ namespace DunesOfArabia.Migrations
                     Category = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Other"),
                     FileSizeBytes = table.Column<long>(type: "bigint", nullable: false),
                     FileUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    UploadedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "GETUTCDATE()")
+                    UploadedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()")
                 },
                 constraints: table =>
                 {
@@ -350,7 +350,7 @@ namespace DunesOfArabia.Migrations
                     Interests = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "GETUTCDATE()")
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()")
                 },
                 constraints: table =>
                 {
