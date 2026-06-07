@@ -102,8 +102,8 @@ namespace DunesOfArabia.Migrations
                     CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ImageGalleryJson = table.Column<string>(type: "text", nullable: false),
-                    ImageGallery = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    HighlightsJson = table.Column<string>(type: "nvarchar(max)", nullable: false, defaultValue: "[]")
+                    ImageGallery = table.Column<string>(type: "text", nullable: false),
+                    HighlightsJson = table.Column<string>(type: "text", nullable: false, defaultValue: "[]")
                 },
                 constraints: table =>
                 {
@@ -347,7 +347,7 @@ namespace DunesOfArabia.Migrations
                     DestinationId = table.Column<int>(type: "integer", nullable: false),
                     Travelers = table.Column<int>(type: "integer", nullable: false),
                     TripType = table.Column<string>(type: "text", nullable: false),
-                    Interests = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Interests = table.Column<string>(type: "text", nullable: false),
                     StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     EndDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()")

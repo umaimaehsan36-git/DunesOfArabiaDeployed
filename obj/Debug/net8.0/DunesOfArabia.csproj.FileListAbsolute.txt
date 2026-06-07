@@ -305,7 +305,6 @@ E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\static
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\staticwebassets.development.json
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\staticwebassets.build.endpoints.json
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\swae.build.ex.cache
-E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\DunesOfA.0BA29239.Up2Date
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\DunesOfArabia.dll
 E:\C# programs\DunesOfArabia\DunesOfArabia\DunesOfArabia\obj\Debug\net8.0\refint\DunesOfArabia.dll
