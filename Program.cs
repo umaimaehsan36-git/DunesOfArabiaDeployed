@@ -17,6 +17,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL;
 using AppReviewService = DunesOfArabia.Services.ReviewService;
 
 var builder = WebApplication.CreateBuilder(args);
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
